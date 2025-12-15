@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mini App テスト</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+  <h1>Mini App テスト</h1>
+  <div id="out">初期化中…</div>
+
+  <script>
+    const LIFF_ID = "ここに開発用LIFF_ID";
+
+    (async () => {
+      try {
+        await liff.init({ liffId: LIFF_ID });
+
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
+
+        const p = await liff.getProfile();
+        document.getElementById("out").textContent =
+          `ログインOK: ${p.displayName}`;
+      } catch (e) {
+        document.getElementById("out").textContent =
+          "エラー: " + e;
+      }
+    })();
+  </script>
+</body>
+</html>
