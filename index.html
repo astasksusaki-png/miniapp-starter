@@ -18,6 +18,7 @@
     .btn-primary { background: #06c755; color: #fff; }
     .btn-ghost { background: #f1f3f5; color: #111; margin-top: 10px; }
     .btn-warn { background: #111; color: #fff; margin-top: 10px; }
+    .btn-disabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; }
     .hr { height: 1px; background: #eceff3; margin: 14px 0; }
     .badge { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #eefaf2; color: #137a3a; font-size: 12px; font-weight: 700; }
     .kv { display: grid; grid-template-columns: 1fr auto; gap: 8px 10px; margin-top: 10px; }
@@ -27,6 +28,17 @@
     .note { font-size: 12px; color: #667085; margin-top: 8px; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; background: #f8fafc; border: 1px solid #e5e7eb; padding: 10px; border-radius: 12px; }
     .hidden { display: none; }
+
+    .rewards { margin-top: 10px; display: grid; gap: 10px; }
+    .rewardCard { border: 1px solid #eceff3; border-radius: 14px; padding: 12px; background: #fbfcfd; }
+    .rewardTop { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+    .rewardTitle { font-weight: 800; font-size: 15px; margin: 0; }
+    .rewardMeta { color: #667085; font-size: 12px; margin: 2px 0 0; }
+    .pill { font-size: 12px; font-weight: 800; padding: 5px 10px; border-radius: 999px; background: #eefaf2; color: #137a3a; }
+    .pill-gray { background: #eef2f7; color: #344054; }
+    .smallBtn { margin-top: 10px; padding: 12px; border-radius: 12px; border: 0; width: 100%; font-weight: 800; cursor: pointer; }
+    .smallBtnPrimary { background: #06c755; color: #fff; }
+    .smallBtnDisabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -34,6 +46,7 @@
     <!-- ホーム（会員証） -->
     <div id="home" class="card">
       <p class="muted" id="hello">読み込み中...</p>
+
       <div class="row">
         <div>
           <h1 class="title">ポイント会員証</h1>
@@ -54,7 +67,13 @@
       <button class="btn btn-primary" id="goAmount">金額入力してポイント申請</button>
       <button class="btn btn-ghost" id="refresh">残高を更新</button>
 
-      <p class="note">※ 開発中：Vercelのメモリ保存のため、環境更新でポイントがリセットされることがあります（本番はDB化します）。</p>
+      <div class="hr"></div>
+
+      <h2 class="title" style="margin-bottom:6px;">景品交換</h2>
+      <p class="muted">50ptごとに景品と交換できます（到達分だけ表示されます）</p>
+      <div id="rewards" class="rewards"></div>
+
+      <p class="note">※ 開発中：Vercelのメモリ保存のため、環境更新でポイント/交換履歴がリセットされることがあります（本番はDB化します）。</p>
     </div>
 
     <!-- 金額入力（申請→承認QR→付与） -->
@@ -91,7 +110,10 @@
       redeemableCount: 0,
       toNext: 0,
       rank: "レギュラー",
-      // 申請情報（サーバから返ってきたものを保持）
+
+      rewardThresholds: [],  // 例: [50,100]
+      claimedRewards: [],    // 例: [50]
+
       requestId: null,
       amount: 0,
       expectedPt: 0,
@@ -115,6 +137,71 @@
       document.getElementById("rankBadge").textContent = `ランク：${state.rank}`;
       document.getElementById("redeemable").textContent = `${state.redeemableCount}回`;
       document.getElementById("toNext").textContent = `${state.toNext}pt`;
+
+      renderRewards();
+    }
+
+    function rewardName(th) {
+      // 例：50pt=景品1、100pt=景品2…（必要なら名称を自由に変えられます）
+      const idx = th / 50;
+      return `景品 ${idx}`;
+    }
+
+    function renderRewards() {
+      const wrap = document.getElementById("rewards");
+      wrap.innerHTML = "";
+
+      if (!state.rewardThresholds || state.rewardThresholds.length === 0) {
+        const div = document.createElement("div");
+        div.className = "rewardCard";
+        div.innerHTML = `
+          <div class="rewardTop">
+            <p class="rewardTitle">まだ交換できる景品がありません</p>
+            <span class="pill pill-gray">未到達</span>
+          </div>
+          <p class="rewardMeta">50pt貯まると景品が表示されます</p>
+        `;
+        wrap.appendChild(div);
+        return;
+      }
+
+      const claimedSet = new Set(state.claimedRewards || []);
+
+      state.rewardThresholds.forEach((th) => {
+        const claimed = claimedSet.has(th);
+
+        const card = document.createElement("div");
+        card.className = "rewardCard";
+
+        const statusPill = claimed
+          ? `<span class="pill pill-gray">交換済み</span>`
+          : `<span class="pill">交換可能</span>`;
+
+        const btnHtml = claimed
+          ? `<button class="smallBtn smallBtnDisabled" disabled>交換済み</button>`
+          : `<button class="smallBtn smallBtnPrimary" data-th="${th}">景品と交換する</button>`;
+
+        card.innerHTML = `
+          <div class="rewardTop">
+            <div>
+              <p class="rewardTitle">${rewardName(th)}</p>
+              <p class="rewardMeta">${th}pt 到達で交換できます</p>
+            </div>
+            ${statusPill}
+          </div>
+          ${btnHtml}
+        `;
+
+        wrap.appendChild(card);
+      });
+
+      // ボタンにイベントを付与
+      wrap.querySelectorAll("button[data-th]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const th = Number(btn.getAttribute("data-th"));
+          await redeemReward(th);
+        });
+      });
     }
 
     async function apiGet(path) {
@@ -137,11 +224,48 @@
 
     async function refreshBalance() {
       if (!state.userId) return;
+
       const data = await apiGet(`/api/me?userId=${encodeURIComponent(state.userId)}`);
       state.points = data.points || 0;
       state.redeemableCount = data.redeemableCount || 0;
       state.toNext = data.toNext || 0;
+
+      state.rewardThresholds = data.rewardThresholds || [];
+      state.claimedRewards = data.claimedRewards || [];
+
       renderHome();
+    }
+
+    async function redeemReward(threshold) {
+      try {
+        if (!state.userId) return;
+
+        // ここで確認ダイアログ（誤操作防止）
+        const ok = window.confirm(`${rewardName(threshold)}（${threshold}pt到達）を交換しますか？`);
+        if (!ok) return;
+
+        const r = await apiPost("/api/redeem", {
+          userId: state.userId,
+          threshold
+        });
+
+        // 交換済み更新 → 最新残高/一覧も取り直す
+        state.claimedRewards = r.claimed || [];
+        await refreshBalance();
+
+        alert("交換を受け付けました。スタッフに画面を見せてください。");
+      } catch (e) {
+        if (e?.status === 409 && e?.data?.error === "ALREADY_REDEEMED") {
+          alert("この景品はすでに交換済みです。");
+          await refreshBalance();
+          return;
+        }
+        if (e?.data?.error === "NOT_ENOUGH_POINTS") {
+          alert("ポイントが足りません。");
+          return;
+        }
+        alert("交換エラー: " + JSON.stringify(e?.data || e));
+      }
     }
 
     function setupUI() {
@@ -172,19 +296,13 @@
       // 申請API
       document.getElementById("apply").addEventListener("click", async () => {
         try {
-          if (!state.userId) {
-            setLog("ユーザーID未取得です（LINE内で開いてください）");
-            return;
-          }
+          if (!state.userId) { setLog("ユーザーID未取得です（LINE内で開いてください）"); return; }
+
           const amount = Number(document.getElementById("yen").value || 0);
-          const pt = Math.floor(amount / 500);
           if (amount <= 0) { setLog("金額を入力してください"); return; }
 
           setLog("申請中…");
-          const r = await apiPost("/api/claim/request", {
-            userId: state.userId,
-            amount
-          });
+          const r = await apiPost("/api/claim/request", { userId: state.userId, amount });
 
           state.requestId = r.requestId;
           state.amount = r.amount;
@@ -226,7 +344,6 @@
 
           setLog(`QR読取OK:\n${approveQr}\n\n付与処理中…`);
 
-          // 付与API
           const a = await apiPost("/api/claim/approve", {
             userId: state.userId,
             requestId: state.requestId,
@@ -243,8 +360,10 @@
           setLog(
             `付与成功 ✅\nstoreId=${a.award.storeId}\npt=${a.award.pt}\n新残高=${a.balance}\n\nホームに戻って確認できます`
           );
+
+          // 付与後に最新の景品一覧も取得
+          await refreshBalance();
         } catch (e) {
-          // 同一店舗1日1回など
           if (e?.status === 409 && e?.data?.error === "ALREADY_AWARDED_TODAY") {
             setLog(`本日はこの店舗では付与済みです。\nstoreId=${e.data.storeId}\n日付=${e.data.date}`);
             return;
@@ -259,7 +378,7 @@
       renderHome();
 
       try {
-        await liff.init({ liffId: LIFF_ID });
+        await liff.init({ liffId: "2008691733-iSoNx2PY" });
 
         if (!liff.isLoggedIn()) {
           liff.login();
@@ -268,10 +387,10 @@
 
         const p = await liff.getProfile();
         state.displayName = p.displayName || "—";
-        state.userId = p.userId; // これが会員キー
+        state.userId = p.userId;
+
         renderHome();
 
-        // 初回残高取得
         setLog("残高取得中…");
         await refreshBalance();
         setLog("準備OK：金額入力へ進めます");
