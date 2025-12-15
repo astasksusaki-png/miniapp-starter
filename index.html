@@ -4,7 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>ポイント会員証</title>
+
+  <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
   <style>
     body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; background: #f6f7f9; }
     .wrap { max-width: 420px; margin: 0 auto; padding: 16px; }
@@ -29,6 +32,7 @@
     .hidden { display: none; }
   </style>
 </head>
+
 <body>
   <div class="wrap">
     <!-- ホーム（会員証） -->
@@ -54,7 +58,7 @@
       <button class="btn btn-primary" id="goAmount">金額入力して申請</button>
       <button class="btn btn-ghost" id="dummyAdd">（仮）+2ptする</button>
 
-      <p class="note">※ STEP B：次の画面で「承認QR読み取り」まで確認します。</p>
+      <p class="note">※ STEP B：金額入力→申請（ダミー）→承認QR読み取り（実機確認）まで。</p>
     </div>
 
     <!-- 金額入力（申請→承認QR読み取り まで） -->
@@ -74,7 +78,13 @@
       <div class="hr"></div>
       <p class="muted" style="margin:0 0 6px;">読み取り結果</p>
       <div id="scanResult" class="mono">まだ読み取っていません</div>
-      <p class="note">※ カメラが起動しない場合は「LINEアプリ内」で開いているか確認してください。</p>
+      <p class="note">
+        ※ カメラが起動しない場合：<br/>
+        ・LINEアプリ内で開いているか<br/>
+        ・LINE Developers側で「Scan QR」を許可しているか<br/>
+        ・LINEアプリが最新版か<br/>
+        を確認してください。
+      </p>
     </div>
   </div>
 
@@ -93,8 +103,8 @@
     function calcNextInfo(points) {
       const nextThreshold = Math.ceil((points + 1) / 50) * 50;
       const toNext = nextThreshold - points;
-      const redeemableCount = Math.floor(points / 50); // 暫定：50ptごとの回数
-      return { nextThreshold, toNext, redeemableCount };
+      const redeemableCount = Math.floor(points / 50); // 暫定：50ptごとの回数表示
+      return { toNext, redeemableCount };
     }
 
     function renderHome() {
@@ -139,32 +149,51 @@
         const amount = Number(document.getElementById("yen").value || 0);
         const pt = Math.floor(amount / 500);
         state.lastRequest = { amount, pt, createdAt: new Date().toISOString() };
-        setScanResult(`申請（ダミー）作成:\namount=${amount}\npt=${pt}\n次に「承認QRを読み取る」を押してください`);
+        setScanResult(
+          `申請（ダミー）作成:\namount=${amount}\npt=${pt}\n\n次に「承認QRを読み取る」を押してください`
+        );
       });
 
-      // 承認QR読み取り（STEP Bの本体）
+      // ★ 承認QR読み取り（STEP B本体）
       document.getElementById("scanApprove").addEventListener("click", async () => {
         try {
           if (!window.liff) {
-            setScanResult("LIFFが読み込まれていません（scriptタグを確認してください）");
+            setScanResult("LIFF SDKが読み込まれていません（scriptタグを確認してください）");
             return;
           }
           if (!liff.isInClient()) {
             setScanResult("LINEアプリ内で開いていません。LINE内で miniapp URL を開いてください。");
             return;
           }
-          if (typeof liff.scanCode !== "function") {
-            setScanResult("この環境ではQR読み取り（scanCode）が利用できません。LINEアプリを最新版にして再確認してください。");
+
+          // iPhoneでも動きやすい：scanCodeV2 を優先
+          if (typeof liff.scanCodeV2 === "function") {
+            setScanResult("カメラ起動中…（scanCodeV2）\nQRを読み取ってください");
+            const res = await liff.scanCodeV2(); // { value: "..." }
+            const value = res?.value ?? "";
+            setScanResult(
+              `読み取り成功:\n${value}\n\n（次のSTEP Cで、このvalueをサーバへ送って承認→付与します）`
+            );
             return;
           }
 
-          setScanResult("カメラ起動中…（QRを読み取ってください）");
-          const res = await liff.scanCode(); // { value: "..." }
-          const value = res?.value || "";
+          // 互換：scanCode（主にAndroidで動くことが多い）
+          if (typeof liff.scanCode === "function") {
+            setScanResult("カメラ起動中…（scanCode）\nQRを読み取ってください");
+            const res = await liff.scanCode(); // { value: "..." }
+            const value = res?.value ?? "";
+            setScanResult(
+              `読み取り成功:\n${value}\n\n（次のSTEP Cで、このvalueをサーバへ送って承認→付与します）`
+            );
+            return;
+          }
 
-          // 将来：value をサーバへ送って approve API を叩く
+          // ここに来るのは「許可設定OFF」「古いLINE」「環境制限」など
           setScanResult(
-            `読み取り成功:\n${value}\n\n（将来ここで承認処理→ポイント付与に進みます）`
+            "この環境ではQR読取が利用できません。\n\n確認ポイント：\n" +
+            "1) LINE Developersで Scan QR を許可したか\n" +
+            "2) LINEアプリ内で開いているか\n" +
+            "3) LINEアプリが最新版か\n"
           );
         } catch (e) {
           setScanResult("読み取りキャンセル/エラー:\n" + (e?.message || e));
