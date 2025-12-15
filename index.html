@@ -4,10 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>ポイント会員証</title>
-
-  <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-
   <style>
     body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; background: #f6f7f9; }
     .wrap { max-width: 420px; margin: 0 auto; padding: 16px; }
@@ -32,14 +29,13 @@
     .hidden { display: none; }
   </style>
 </head>
-
 <body>
   <div class="wrap">
     <!-- ホーム（会員証） -->
     <div id="home" class="card">
+      <p class="muted" id="hello">読み込み中...</p>
       <div class="row">
         <div>
-          <p class="muted" id="hello">読み込み中...</p>
           <h1 class="title">ポイント会員証</h1>
           <span class="badge" id="rankBadge">ランク：—</span>
         </div>
@@ -55,66 +51,54 @@
 
       <div class="hr"></div>
 
-      <button class="btn btn-primary" id="goAmount">金額入力して申請</button>
-      <button class="btn btn-ghost" id="dummyAdd">（仮）+2ptする</button>
+      <button class="btn btn-primary" id="goAmount">金額入力してポイント申請</button>
+      <button class="btn btn-ghost" id="refresh">残高を更新</button>
 
-      <p class="note">※ STEP B：金額入力→申請（ダミー）→承認QR読み取り（実機確認）まで。</p>
+      <p class="note">※ 開発中：Vercelのメモリ保存のため、環境更新でポイントがリセットされることがあります（本番はDB化します）。</p>
     </div>
 
-    <!-- 金額入力（申請→承認QR読み取り まで） -->
+    <!-- 金額入力（申請→承認QR→付与） -->
     <div id="amount" class="card hidden">
       <h1 class="title">金額入力</h1>
-      <p class="muted">レジで確認した金額を入力（※まだサーバ未接続）</p>
+      <p class="muted">会計金額を入力 → 申請 → 承認QR読み取り → 付与</p>
 
       <div style="margin-top:12px;">
         <input id="yen" type="number" inputmode="numeric" placeholder="例：1280" min="0" />
         <p class="note">500円につき1pt：<b id="calcPt">0pt</b></p>
       </div>
 
-      <button class="btn btn-primary" id="apply" style="margin-top:12px;">申請する（ダミー）</button>
-      <button class="btn btn-warn" id="scanApprove">承認QRを読み取る</button>
+      <button class="btn btn-primary" id="apply" style="margin-top:12px;">申請する</button>
+      <button class="btn btn-warn" id="scanApprove">承認QRを読み取る（付与）</button>
       <button class="btn btn-ghost" id="backHome">ホームに戻る</button>
 
       <div class="hr"></div>
-      <p class="muted" style="margin:0 0 6px;">読み取り結果</p>
-      <div id="scanResult" class="mono">まだ読み取っていません</div>
+      <p class="muted" style="margin:0 0 6px;">ログ</p>
+      <div id="log" class="mono">準備中…</div>
       <p class="note">
-        ※ カメラが起動しない場合：<br/>
-        ・LINEアプリ内で開いているか<br/>
-        ・LINE Developers側で「Scan QR」を許可しているか<br/>
-        ・LINEアプリが最新版か<br/>
-        を確認してください。
+        ※ 承認QR例：<br/>
+        APPROVE:v1:STORE=1:TYPE=STATIC
       </p>
     </div>
   </div>
 
   <script>
-    // あなたの開発用 LIFF ID（入力済み）
     const LIFF_ID = "2008691733-iSoNx2PY";
 
-    // ダミーデータ（後でサーバから取得に置き換える）
     const state = {
       displayName: "—",
+      userId: null,
       points: 0,
+      redeemableCount: 0,
+      toNext: 0,
       rank: "レギュラー",
-      lastRequest: null, // { amount, pt, createdAt }
+      // 申請情報（サーバから返ってきたものを保持）
+      requestId: null,
+      amount: 0,
+      expectedPt: 0,
     };
 
-    function calcNextInfo(points) {
-      const nextThreshold = Math.ceil((points + 1) / 50) * 50;
-      const toNext = nextThreshold - points;
-      const redeemableCount = Math.floor(points / 50); // 暫定：50ptごとの回数表示
-      return { toNext, redeemableCount };
-    }
-
-    function renderHome() {
-      document.getElementById("hello").textContent = `こんにちは、${state.displayName} さん`;
-      document.getElementById("points").textContent = String(state.points);
-      document.getElementById("rankBadge").textContent = `ランク：${state.rank}`;
-
-      const { toNext, redeemableCount } = calcNextInfo(state.points);
-      document.getElementById("toNext").textContent = `${toNext}pt`;
-      document.getElementById("redeemable").textContent = `${redeemableCount}回`;
+    function setLog(text) {
+      document.getElementById("log").textContent = text;
     }
 
     function show(screenId) {
@@ -123,17 +107,58 @@
       document.getElementById(screenId).classList.remove("hidden");
     }
 
-    function setScanResult(text) {
-      document.getElementById("scanResult").textContent = text;
+    function renderHome() {
+      document.getElementById("hello").textContent =
+        state.userId ? `こんにちは、${state.displayName} さん` : "ログイン中…";
+
+      document.getElementById("points").textContent = String(state.points);
+      document.getElementById("rankBadge").textContent = `ランク：${state.rank}`;
+      document.getElementById("redeemable").textContent = `${state.redeemableCount}回`;
+      document.getElementById("toNext").textContent = `${state.toNext}pt`;
+    }
+
+    async function apiGet(path) {
+      const res = await fetch(path, { method: "GET" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw { status: res.status, data };
+      return data;
+    }
+
+    async function apiPost(path, body) {
+      const res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw { status: res.status, data };
+      return data;
+    }
+
+    async function refreshBalance() {
+      if (!state.userId) return;
+      const data = await apiGet(`/api/me?userId=${encodeURIComponent(state.userId)}`);
+      state.points = data.points || 0;
+      state.redeemableCount = data.redeemableCount || 0;
+      state.toNext = data.toNext || 0;
+      renderHome();
     }
 
     function setupUI() {
-      document.getElementById("goAmount").addEventListener("click", () => show("amount"));
+      document.getElementById("goAmount").addEventListener("click", () => {
+        setLog("金額を入力して「申請する」を押してください");
+        show("amount");
+      });
       document.getElementById("backHome").addEventListener("click", () => show("home"));
 
-      document.getElementById("dummyAdd").addEventListener("click", () => {
-        state.points += 2; // 仮
-        renderHome();
+      document.getElementById("refresh").addEventListener("click", async () => {
+        try {
+          setLog("残高更新中…");
+          await refreshBalance();
+          setLog("残高を更新しました");
+        } catch (e) {
+          setLog("残高更新エラー: " + JSON.stringify(e?.data || e));
+        }
       });
 
       const yen = document.getElementById("yen");
@@ -144,59 +169,87 @@
         calcPt.textContent = `${pt}pt`;
       });
 
-      // 申請（ダミー）
-      document.getElementById("apply").addEventListener("click", () => {
-        const amount = Number(document.getElementById("yen").value || 0);
-        const pt = Math.floor(amount / 500);
-        state.lastRequest = { amount, pt, createdAt: new Date().toISOString() };
-        setScanResult(
-          `申請（ダミー）作成:\namount=${amount}\npt=${pt}\n\n次に「承認QRを読み取る」を押してください`
-        );
-      });
-
-      // ★ 承認QR読み取り（STEP B本体）
-      document.getElementById("scanApprove").addEventListener("click", async () => {
+      // 申請API
+      document.getElementById("apply").addEventListener("click", async () => {
         try {
-          if (!window.liff) {
-            setScanResult("LIFF SDKが読み込まれていません（scriptタグを確認してください）");
+          if (!state.userId) {
+            setLog("ユーザーID未取得です（LINE内で開いてください）");
             return;
           }
-          if (!liff.isInClient()) {
-            setScanResult("LINEアプリ内で開いていません。LINE内で miniapp URL を開いてください。");
-            return;
-          }
+          const amount = Number(document.getElementById("yen").value || 0);
+          const pt = Math.floor(amount / 500);
+          if (amount <= 0) { setLog("金額を入力してください"); return; }
 
-          // iPhoneでも動きやすい：scanCodeV2 を優先
-          if (typeof liff.scanCodeV2 === "function") {
-            setScanResult("カメラ起動中…（scanCodeV2）\nQRを読み取ってください");
-            const res = await liff.scanCodeV2(); // { value: "..." }
-            const value = res?.value ?? "";
-            setScanResult(
-              `読み取り成功:\n${value}\n\n（次のSTEP Cで、このvalueをサーバへ送って承認→付与します）`
-            );
-            return;
-          }
+          setLog("申請中…");
+          const r = await apiPost("/api/claim/request", {
+            userId: state.userId,
+            amount
+          });
 
-          // 互換：scanCode（主にAndroidで動くことが多い）
-          if (typeof liff.scanCode === "function") {
-            setScanResult("カメラ起動中…（scanCode）\nQRを読み取ってください");
-            const res = await liff.scanCode(); // { value: "..." }
-            const value = res?.value ?? "";
-            setScanResult(
-              `読み取り成功:\n${value}\n\n（次のSTEP Cで、このvalueをサーバへ送って承認→付与します）`
-            );
-            return;
-          }
+          state.requestId = r.requestId;
+          state.amount = r.amount;
+          state.expectedPt = r.pt;
 
-          // ここに来るのは「許可設定OFF」「古いLINE」「環境制限」など
-          setScanResult(
-            "この環境ではQR読取が利用できません。\n\n確認ポイント：\n" +
-            "1) LINE Developersで Scan QR を許可したか\n" +
-            "2) LINEアプリ内で開いているか\n" +
-            "3) LINEアプリが最新版か\n"
+          setLog(
+            `申請OK\nrequestId=${state.requestId}\namount=${state.amount}\npt=${state.expectedPt}\n\n次に「承認QRを読み取る（付与）」を押してください`
           );
         } catch (e) {
-          setScanResult("読み取りキャンセル/エラー:\n" + (e?.message || e));
+          setLog("申請エラー: " + JSON.stringify(e?.data || e));
+        }
+      });
+
+      // 承認QR読み取り → 付与API
+      document.getElementById("scanApprove").addEventListener("click", async () => {
+        try {
+          if (!state.userId) { setLog("ユーザーID未取得です"); return; }
+          if (!state.requestId) { setLog("先に「申請する」を押してください"); return; }
+
+          if (!liff.isInClient()) {
+            setLog("LINEアプリ内で開いていません。LINE内で miniapp URL を開いてください。");
+            return;
+          }
+
+          // QR読み取り（scanCodeV2優先）
+          let approveQr = null;
+          if (typeof liff.scanCodeV2 === "function") {
+            setLog("カメラ起動中…（QRを読み取ってください）");
+            const res = await liff.scanCodeV2();
+            approveQr = res?.value ?? "";
+          } else if (typeof liff.scanCode === "function") {
+            setLog("カメラ起動中…（QRを読み取ってください）");
+            const res = await liff.scanCode();
+            approveQr = res?.value ?? "";
+          } else {
+            setLog("この環境ではQR読取が利用できません（scanCodeV2/scanCodeが無効）");
+            return;
+          }
+
+          setLog(`QR読取OK:\n${approveQr}\n\n付与処理中…`);
+
+          // 付与API
+          const a = await apiPost("/api/claim/approve", {
+            userId: state.userId,
+            requestId: state.requestId,
+            amount: state.amount,
+            approveQr
+          });
+
+          // 付与結果でUI更新
+          state.points = a.balance;
+          state.redeemableCount = a.redeemableCount;
+          state.toNext = a.toNext;
+
+          renderHome();
+          setLog(
+            `付与成功 ✅\nstoreId=${a.award.storeId}\npt=${a.award.pt}\n新残高=${a.balance}\n\nホームに戻って確認できます`
+          );
+        } catch (e) {
+          // 同一店舗1日1回など
+          if (e?.status === 409 && e?.data?.error === "ALREADY_AWARDED_TODAY") {
+            setLog(`本日はこの店舗では付与済みです。\nstoreId=${e.data.storeId}\n日付=${e.data.date}`);
+            return;
+          }
+          setLog("付与エラー: " + JSON.stringify(e?.data || e));
         }
       });
     }
@@ -215,9 +268,16 @@
 
         const p = await liff.getProfile();
         state.displayName = p.displayName || "—";
+        state.userId = p.userId; // これが会員キー
         renderHome();
+
+        // 初回残高取得
+        setLog("残高取得中…");
+        await refreshBalance();
+        setLog("準備OK：金額入力へ進めます");
       } catch (e) {
         document.getElementById("hello").textContent = "LIFF初期化エラー：" + (e?.message || e);
+        setLog("LIFF初期化エラー：" + (e?.message || e));
       }
     }
 
