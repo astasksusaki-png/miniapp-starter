@@ -17,6 +17,7 @@
     .btn { width: 100%; border: 0; border-radius: 12px; padding: 14px 12px; font-size: 15px; font-weight: 700; cursor: pointer; }
     .btn-primary { background: #06c755; color: #fff; }
     .btn-ghost { background: #f1f3f5; color: #111; margin-top: 10px; }
+    .btn-warn { background: #111; color: #fff; margin-top: 10px; }
     .hr { height: 1px; background: #eceff3; margin: 14px 0; }
     .badge { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #eefaf2; color: #137a3a; font-size: 12px; font-weight: 700; }
     .kv { display: grid; grid-template-columns: 1fr auto; gap: 8px 10px; margin-top: 10px; }
@@ -24,6 +25,7 @@
     .kv div:nth-child(2n) { color: #111; font-weight: 700; text-align: right; }
     input[type="number"] { width: 100%; padding: 12px; font-size: 16px; border-radius: 12px; border: 1px solid #d0d5dd; }
     .note { font-size: 12px; color: #667085; margin-top: 8px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; background: #f8fafc; border: 1px solid #e5e7eb; padding: 10px; border-radius: 12px; }
     .hidden { display: none; }
   </style>
 </head>
@@ -49,15 +51,15 @@
 
       <div class="hr"></div>
 
-      <button class="btn btn-primary" id="goAmount">金額入力してポイント申請</button>
+      <button class="btn btn-primary" id="goAmount">金額入力して申請</button>
       <button class="btn btn-ghost" id="dummyAdd">（仮）+2ptする</button>
 
-      <p class="note">※ この画面はSTEP A（ダミー）です。次に金額入力→承認QR→サーバ連携を追加します。</p>
+      <p class="note">※ STEP B：次の画面で「承認QR読み取り」まで確認します。</p>
     </div>
 
-    <!-- 金額入力（まだダミー） -->
+    <!-- 金額入力（申請→承認QR読み取り まで） -->
     <div id="amount" class="card hidden">
-      <h1 class="title">金額入力（ダミー）</h1>
+      <h1 class="title">金額入力</h1>
       <p class="muted">レジで確認した金額を入力（※まだサーバ未接続）</p>
 
       <div style="margin-top:12px;">
@@ -65,12 +67,19 @@
         <p class="note">500円につき1pt：<b id="calcPt">0pt</b></p>
       </div>
 
-      <button class="btn btn-primary" id="backHome" style="margin-top:12px;">ホームに戻る</button>
+      <button class="btn btn-primary" id="apply" style="margin-top:12px;">申請する（ダミー）</button>
+      <button class="btn btn-warn" id="scanApprove">承認QRを読み取る</button>
+      <button class="btn btn-ghost" id="backHome">ホームに戻る</button>
+
+      <div class="hr"></div>
+      <p class="muted" style="margin:0 0 6px;">読み取り結果</p>
+      <div id="scanResult" class="mono">まだ読み取っていません</div>
+      <p class="note">※ カメラが起動しない場合は「LINEアプリ内」で開いているか確認してください。</p>
     </div>
   </div>
 
   <script>
-    // ★あなたの開発用LIFF IDに置き換えてください
+    // あなたの開発用 LIFF ID（入力済み）
     const LIFF_ID = "2008691733-iSoNx2PY";
 
     // ダミーデータ（後でサーバから取得に置き換える）
@@ -78,12 +87,13 @@
       displayName: "—",
       points: 0,
       rank: "レギュラー",
+      lastRequest: null, // { amount, pt, createdAt }
     };
 
     function calcNextInfo(points) {
-      const nextThreshold = Math.ceil((points + 1) / 50) * 50; // 次の50刻み
+      const nextThreshold = Math.ceil((points + 1) / 50) * 50;
       const toNext = nextThreshold - points;
-      const redeemableCount = Math.floor(points / 50); // 50ptごとの交換可能回数（暫定表示）
+      const redeemableCount = Math.floor(points / 50); // 暫定：50ptごとの回数
       return { nextThreshold, toNext, redeemableCount };
     }
 
@@ -103,6 +113,10 @@
       document.getElementById(screenId).classList.remove("hidden");
     }
 
+    function setScanResult(text) {
+      document.getElementById("scanResult").textContent = text;
+    }
+
     function setupUI() {
       document.getElementById("goAmount").addEventListener("click", () => show("amount"));
       document.getElementById("backHome").addEventListener("click", () => show("home"));
@@ -118,6 +132,43 @@
         const v = Number(yen.value || 0);
         const pt = Math.floor(v / 500);
         calcPt.textContent = `${pt}pt`;
+      });
+
+      // 申請（ダミー）
+      document.getElementById("apply").addEventListener("click", () => {
+        const amount = Number(document.getElementById("yen").value || 0);
+        const pt = Math.floor(amount / 500);
+        state.lastRequest = { amount, pt, createdAt: new Date().toISOString() };
+        setScanResult(`申請（ダミー）作成:\namount=${amount}\npt=${pt}\n次に「承認QRを読み取る」を押してください`);
+      });
+
+      // 承認QR読み取り（STEP Bの本体）
+      document.getElementById("scanApprove").addEventListener("click", async () => {
+        try {
+          if (!window.liff) {
+            setScanResult("LIFFが読み込まれていません（scriptタグを確認してください）");
+            return;
+          }
+          if (!liff.isInClient()) {
+            setScanResult("LINEアプリ内で開いていません。LINE内で miniapp URL を開いてください。");
+            return;
+          }
+          if (typeof liff.scanCode !== "function") {
+            setScanResult("この環境ではQR読み取り（scanCode）が利用できません。LINEアプリを最新版にして再確認してください。");
+            return;
+          }
+
+          setScanResult("カメラ起動中…（QRを読み取ってください）");
+          const res = await liff.scanCode(); // { value: "..." }
+          const value = res?.value || "";
+
+          // 将来：value をサーバへ送って approve API を叩く
+          setScanResult(
+            `読み取り成功:\n${value}\n\n（将来ここで承認処理→ポイント付与に進みます）`
+          );
+        } catch (e) {
+          setScanResult("読み取りキャンセル/エラー:\n" + (e?.message || e));
+        }
       });
     }
 
@@ -135,9 +186,6 @@
 
         const p = await liff.getProfile();
         state.displayName = p.displayName || "—";
-        // ここで本来は userId をサーバに送ってポイント残高を取得します
-        // const userId = p.userId;
-
         renderHome();
       } catch (e) {
         document.getElementById("hello").textContent = "LIFF初期化エラー：" + (e?.message || e);
@@ -148,5 +196,3 @@
   </script>
 </body>
 </html>
-
-
