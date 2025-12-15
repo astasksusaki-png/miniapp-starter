@@ -3,17 +3,128 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Mini App テスト</title>
+  <title>ポイント会員証</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; background: #f6f7f9; }
+    .wrap { max-width: 420px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 4px 16px rgba(0,0,0,.06); }
+    .title { font-size: 18px; font-weight: 700; margin: 0 0 8px; }
+    .muted { color: #667085; font-size: 13px; margin: 0; }
+    .row { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .pt { font-size: 44px; font-weight: 800; line-height: 1; }
+    .pt small { font-size: 16px; font-weight: 700; color: #667085; }
+    .btn { width: 100%; border: 0; border-radius: 12px; padding: 14px 12px; font-size: 15px; font-weight: 700; cursor: pointer; }
+    .btn-primary { background: #06c755; color: #fff; }
+    .btn-ghost { background: #f1f3f5; color: #111; margin-top: 10px; }
+    .hr { height: 1px; background: #eceff3; margin: 14px 0; }
+    .badge { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #eefaf2; color: #137a3a; font-size: 12px; font-weight: 700; }
+    .kv { display: grid; grid-template-columns: 1fr auto; gap: 8px 10px; margin-top: 10px; }
+    .kv div { font-size: 13px; color: #344054; }
+    .kv div:nth-child(2n) { color: #111; font-weight: 700; text-align: right; }
+    input[type="number"] { width: 100%; padding: 12px; font-size: 16px; border-radius: 12px; border: 1px solid #d0d5dd; }
+    .note { font-size: 12px; color: #667085; margin-top: 8px; }
+    .hidden { display: none; }
+  </style>
 </head>
 <body>
-  <h1>Mini App テスト</h1>
-  <div id="out">初期化中…</div>
+  <div class="wrap">
+    <!-- ホーム（会員証） -->
+    <div id="home" class="card">
+      <div class="row">
+        <div>
+          <p class="muted" id="hello">読み込み中...</p>
+          <h1 class="title">ポイント会員証</h1>
+          <span class="badge" id="rankBadge">ランク：—</span>
+        </div>
+        <div class="pt"><span id="points">0</span><small>pt</small></div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="kv">
+        <div>次の景品まで</div><div id="toNext">—</div>
+        <div>交換可能</div><div id="redeemable">—</div>
+      </div>
+
+      <div class="hr"></div>
+
+      <button class="btn btn-primary" id="goAmount">金額入力してポイント申請</button>
+      <button class="btn btn-ghost" id="dummyAdd">（仮）+2ptする</button>
+
+      <p class="note">※ この画面はSTEP A（ダミー）です。次に金額入力→承認QR→サーバ連携を追加します。</p>
+    </div>
+
+    <!-- 金額入力（まだダミー） -->
+    <div id="amount" class="card hidden">
+      <h1 class="title">金額入力（ダミー）</h1>
+      <p class="muted">レジで確認した金額を入力（※まだサーバ未接続）</p>
+
+      <div style="margin-top:12px;">
+        <input id="yen" type="number" inputmode="numeric" placeholder="例：1280" min="0" />
+        <p class="note">500円につき1pt：<b id="calcPt">0pt</b></p>
+      </div>
+
+      <button class="btn btn-primary" id="backHome" style="margin-top:12px;">ホームに戻る</button>
+    </div>
+  </div>
 
   <script>
+    // ★あなたの開発用LIFF IDに置き換えてください
     const LIFF_ID = "2008691733-iSoNx2PY";
 
-    (async () => {
+    // ダミーデータ（後でサーバから取得に置き換える）
+    const state = {
+      displayName: "—",
+      points: 0,
+      rank: "レギュラー",
+    };
+
+    function calcNextInfo(points) {
+      const nextThreshold = Math.ceil((points + 1) / 50) * 50; // 次の50刻み
+      const toNext = nextThreshold - points;
+      const redeemableCount = Math.floor(points / 50); // 50ptごとの交換可能回数（暫定表示）
+      return { nextThreshold, toNext, redeemableCount };
+    }
+
+    function renderHome() {
+      document.getElementById("hello").textContent = `こんにちは、${state.displayName} さん`;
+      document.getElementById("points").textContent = String(state.points);
+      document.getElementById("rankBadge").textContent = `ランク：${state.rank}`;
+
+      const { toNext, redeemableCount } = calcNextInfo(state.points);
+      document.getElementById("toNext").textContent = `${toNext}pt`;
+      document.getElementById("redeemable").textContent = `${redeemableCount}回`;
+    }
+
+    function show(screenId) {
+      document.getElementById("home").classList.add("hidden");
+      document.getElementById("amount").classList.add("hidden");
+      document.getElementById(screenId).classList.remove("hidden");
+    }
+
+    function setupUI() {
+      document.getElementById("goAmount").addEventListener("click", () => show("amount"));
+      document.getElementById("backHome").addEventListener("click", () => show("home"));
+
+      document.getElementById("dummyAdd").addEventListener("click", () => {
+        state.points += 2; // 仮
+        renderHome();
+      });
+
+      const yen = document.getElementById("yen");
+      const calcPt = document.getElementById("calcPt");
+      yen.addEventListener("input", () => {
+        const v = Number(yen.value || 0);
+        const pt = Math.floor(v / 500);
+        calcPt.textContent = `${pt}pt`;
+      });
+    }
+
+    async function main() {
+      setupUI();
+      renderHome();
+
       try {
         await liff.init({ liffId: LIFF_ID });
 
@@ -23,14 +134,19 @@
         }
 
         const p = await liff.getProfile();
-        document.getElementById("out").textContent =
-          `ログインOK: ${p.displayName}`;
+        state.displayName = p.displayName || "—";
+        // ここで本来は userId をサーバに送ってポイント残高を取得します
+        // const userId = p.userId;
+
+        renderHome();
       } catch (e) {
-        document.getElementById("out").textContent =
-          "エラー: " + e;
+        document.getElementById("hello").textContent = "LIFF初期化エラー：" + (e?.message || e);
       }
-    })();
+    }
+
+    main();
   </script>
 </body>
 </html>
+
 
