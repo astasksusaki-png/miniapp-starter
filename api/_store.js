@@ -1,9 +1,11 @@
 // ※ 開発用メモリ保存（Vercelは再起動/スケールでリセットされるので本番はDBに置き換え）
 export const store = globalThis.__miniapp_store__ || {
-  users: new Map(),          // userId -> { points }
-  dailyAward: new Set(),     // `${dateJST}|${storeId}|${userId}`
-  ledger: [],                // ログ
+  users: new Map(),
+  dailyAward: new Set(),
+  ledger: [],
+  claimedRewards: new Map(), // ★追加：userId -> Set(threshold)
 };
+
 globalThis.__miniapp_store__ = store;
 
 export function getDateKeyJST(d = new Date()) {
@@ -58,4 +60,8 @@ export function json(res, code, body) {
   res.statusCode = code;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.end(JSON.stringify(body));
+}
+export function getClaimedSet(userId) {
+  if (!store.claimedRewards.has(userId)) store.claimedRewards.set(userId, new Set());
+  return store.claimedRewards.get(userId);
 }
