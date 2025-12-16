@@ -1,22 +1,13 @@
-let _client = null;
+import supabasePkg from "@supabase/supabase-js";
 
-export async function supabaseAdmin() {
-  if (_client) return _client;
-
-  // ★ ここが重要：ESM入口ではなく CJS入口（dist/main）を読む
-  const mod = await import("@supabase/supabase-js/dist/main/index.js");
-  const createClient = mod.createClient || mod.default?.createClient;
-
-  if (!createClient) {
-    throw new Error("createClient not found");
-  }
-
+export function supabaseAdmin() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
-  }
+  if (!url || !key) throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
 
-  _client = createClient(url, key);
-  return _client;
+  // v1: createClient は default から取れることが多い
+  const createClient = supabasePkg.createClient || supabasePkg.default?.createClient;
+  if (!createClient) throw new Error("createClient not found");
+
+  return createClient(url, key);
 }
