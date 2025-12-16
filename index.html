@@ -40,6 +40,18 @@
     .smallBtn { margin-top: 10px; padding: 12px; border-radius: 12px; border: 0; width: 100%; font-weight: 800; cursor: pointer; }
     .smallBtnPrimary { background: #06c755; color: #fff; }
     .smallBtnDisabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; }
+ /* ★タップが効かない対策：ボタンを最前面にする */
+#goAmount, #refresh, #apply, #scanApprove, #backHome, #saveProfile, #cancelProfile {
+  position: relative;
+  z-index: 9999;
+  pointer-events: auto;
+}
+
+/* もし透明なレイヤーが被っていても影響を減らす */
+.card, .wrap {
+  position: relative;
+}
+
   </style>
 </head>
 <body>
@@ -504,5 +516,6 @@ window.addEventListener("load", () => {
 
 </body>
 </html>
+
 
 
