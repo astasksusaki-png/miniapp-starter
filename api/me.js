@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   const userId = url.searchParams.get("userId");
   if (!userId) return json(res, 400, { ok: false, error: "userId is required" });
 
-  const sb = supabaseAdmin();
+  const sb = await supabaseAdmin();
 
   const { data: up, error: e1 } = await sb
     .from("user_points")
