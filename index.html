@@ -127,7 +127,15 @@
     const LIFF_ID = "2008691733-iSoNx2PY";
 
     const state = {
-      displayName: "—",
+    // ★デバッグ：ボタンが押されているか確認
+window.addEventListener("load", () => {
+  const btn = document.getElementById("goAmount");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    alert("goAmount clicked"); // ← 押したら必ず出る
+  });
+});
+  displayName: "—",
       userId: null,
       points: 0,
       redeemableCount: 0,
@@ -496,4 +504,5 @@
 
 </body>
 </html>
+
 
