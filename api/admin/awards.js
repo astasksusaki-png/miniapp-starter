@@ -11,7 +11,7 @@ export default async function handler(req, res) {
       return json(res, 401, { ok: false, error: "UNAUTHORIZED" });
     }
 
-    const sb = await supabaseAdmin(); // ★ await を付ける
+    const sb = supabaseAdmin();
 
     const { data, error } = await sb
       .from("point_awards")
