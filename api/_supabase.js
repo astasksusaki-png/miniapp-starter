@@ -3,7 +3,12 @@ let _client = null;
 export async function supabaseAdmin() {
   if (_client) return _client;
 
-  const { createClient } = await import("@supabase/supabase-js");
+  const mod = await import("@supabase/supabase-js");
+  const createClient = mod.createClient || mod.default?.createClient;
+
+  if (!createClient) {
+    throw new Error("createClient not found in supabase-js");
+  }
 
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
