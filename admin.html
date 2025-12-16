@@ -97,6 +97,14 @@
     function dt(s){ try { return new Date(s).toLocaleString("ja-JP"); } catch { return s; } }
 
     el("token").value = qs.get("token") || "";
+// ★ URLに token があれば自動セットして読み込む（確実版）
+window.addEventListener("load", () => {
+  const t = qs.get("token");
+  if (t) {
+    el("token").value = t;
+    setTimeout(load, 100); // ← 少し待ってから実行
+  }
+});
 
     async function load() {
       const token = el("token").value.trim();
