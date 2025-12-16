@@ -88,26 +88,40 @@
     </div>
   </div>
 
-  <script>
-    const qs = new URLSearchParams(location.search);
-    const el = (id) => document.getElementById(id);
+ <script>
+  const qs = new URLSearchParams(location.search);
+  const el = (id) => document.getElementById(id);
 
-    function yen(n){ return (n||0).toLocaleString("ja-JP") + "円"; }
-    function pt(n){ return (n||0).toLocaleString("ja-JP") + "pt"; }
-    function dt(s){ try { return new Date(s).toLocaleString("ja-JP"); } catch { return s; } }
+  function yen(n){ return (n||0).toLocaleString("ja-JP") + "円"; }
+  function pt(n){ return (n||0).toLocaleString("ja-JP") + "pt"; }
+  function dt(s){ try { return new Date(s).toLocaleString("ja-JP"); } catch { return s; } }
 
-    el("token").value = qs.get("token") || "";
-// ★ URLに token があれば自動セットして読み込む（確実版）
-window.addEventListener("load", () => {
-  const t = qs.get("token");
-  if (t) {
-    el("token").value = t;
-    setTimeout(load, 100); // ← 少し待ってから実行
+  // 画面に状況を出す（何が起きてるか分かるように）
+  function setStatus(msg) {
+    let box = document.getElementById("statusBox");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "statusBox";
+      box.style.marginTop = "10px";
+      box.style.padding = "10px 12px";
+      box.style.borderRadius = "12px";
+      box.style.border = "1px solid #eceff3";
+      box.style.background = "#fbfcfd";
+      box.style.fontSize = "13px";
+      box.style.whiteSpace = "pre-wrap";
+      el("kpi").parentNode.insertBefore(box, el("kpi"));
+    }
+    box.textContent = msg;
   }
-});
 
-    async function load() {
-      const token = el("token").value.trim();
+  async function load() {
+    try {
+      const token = (el("token").value || "").trim();
+      if (!token) {
+        setStatus("token が空です（URLに ?token=... を付けるか、入力欄に入れてください）");
+        return;
+      }
+
       const storeId = el("storeId").value;
       const from = el("from").value;
       const to = el("to").value;
@@ -120,20 +134,33 @@ window.addEventListener("load", () => {
       if (to) u.searchParams.set("to", to);
       if (limit) u.searchParams.set("limit", limit);
 
-      const res = await fetch(u.toString());
-      const data = await res.json().catch(() => ({}));
+      setStatus("読み込み中...\n" + u.toString());
 
-      if (!res.ok || !data.ok) {
-        alert("読み込み失敗: " + JSON.stringify(data));
+      const res = await fetch(u.toString(), { cache: "no-store" });
+      const text = await res.text();
+
+      let data = null;
+      try { data = JSON.parse(text); } catch { data = null; }
+
+      if (!res.ok || !data || !data.ok) {
+        setStatus("読み込み失敗\nHTTP " + res.status + "\n" + text);
         return;
       }
 
+      // KPI
+      const summary = data.summary || {
+        totalAwards: data.rows?.length || 0,
+        totalPoints: (data.rows||[]).reduce((s,r)=>s+(r.added_points||0),0),
+        totalAmount: (data.rows||[]).reduce((s,r)=>s+(r.amount||0),0),
+      };
+
       el("kpi").innerHTML = `
-        <div><div class="muted">件数</div><b>${data.summary.totalAwards}</b></div>
-        <div><div class="muted">合計付与pt</div><b>${pt(data.summary.totalPoints)}</b></div>
-        <div><div class="muted">合計金額</div><b>${yen(data.summary.totalAmount)}</b></div>
+        <div><div class="muted">件数</div><b>${summary.totalAwards}</b></div>
+        <div><div class="muted">合計付与pt</div><b>${pt(summary.totalPoints)}</b></div>
+        <div><div class="muted">合計金額</div><b>${yen(summary.totalAmount)}</b></div>
       `;
 
+      // Table
       const tbody = el("tbody");
       tbody.innerHTML = "";
       for (const r of data.rows) {
@@ -147,16 +174,23 @@ window.addEventListener("load", () => {
         `;
         tbody.appendChild(tr);
       }
+
+      setStatus("読み込み成功（" + (data.rows?.length || 0) + "件）");
+    } catch (e) {
+      setStatus("JSエラーで停止しました:\n" + (e?.stack || String(e)));
     }
+  }
 
-   el("load").addEventListener("click", load);
+  // ボタン動作
+  el("load").addEventListener("click", load);
 
-// ページが完全に表示されてから実行（スマホ/LINE内で特に効く）
-window.addEventListener("load", () => {
-  setTimeout(load, 100);
-});
+  // URL token があれば自動反映して自動読み込み
+  window.addEventListener("load", () => {
+    const t = qs.get("token");
+    if (t) el("token").value = t;
+    setTimeout(load, 50);
+  });
+</script>
 
-
-  </script>
 </body>
 </html>
