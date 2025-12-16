@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     const parsed = parseApproveQr(approveQr);
     if (!parsed) return json(res, 400, { ok: false, error: "approveQr format invalid" });
 
-   const sb = await supabaseAdmin();
+  const sb = supabaseAdmin();
     const awardDate = getDateKeyJST(); // YYYY-MM-DD (JST)
 
     const { data, error } = await sb.rpc("award_points", {
