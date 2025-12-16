@@ -1,15 +1,7 @@
 import { json } from "../_store.js";
 import { supabaseAdmin } from "../_supabase.js";
 
-function clean(s) {
-  return (s || "").trim();
-}
-
-// 「漢字推奨」：完全に漢字縛りにすると実運用で詰むので、ここは“空欄禁止”だけにしておくのが安全
-function isValidName(s) {
-  const v = clean(s);
-  return v.length >= 1 && v.length <= 30;
-}
+const clean = (s) => (s || "").trim();
 
 export default async function handler(req, res) {
   try {
@@ -21,13 +13,12 @@ export default async function handler(req, res) {
     const first_name = clean(body.first_name);
 
     if (!user_id) return json(res, 400, { ok: false, error: "Missing user_id" });
-    if (!isValidName(last_name) || !isValidName(first_name)) {
-      return json(res, 400, { ok: false, error: "Invalid name" });
-    }
+    if (!last_name || !first_name) return json(res, 400, { ok: false, error: "Name required" });
+    if (last_name.length > 30 || first_name.length > 30) return json(res, 400, { ok: false, error: "Name too long" });
 
     const sb = supabaseAdmin();
 
-    // 初回のみ（すでにあれば拒否）
+    // すでに登録済みなら拒否（初回のみ）
     const { data: existing, error: e1 } = await sb
       .from("user_profiles")
       .select("user_id")
