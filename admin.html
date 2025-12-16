@@ -141,8 +141,13 @@
       }
     }
 
-    el("load").addEventListener("click", load);
-load();
+   el("load").addEventListener("click", load);
+
+// ページが完全に表示されてから実行（スマホ/LINE内で特に効く）
+window.addEventListener("load", () => {
+  setTimeout(load, 100);
+});
+
 
   </script>
 </body>
