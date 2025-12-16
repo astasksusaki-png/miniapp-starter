@@ -25,6 +25,7 @@
     .kv div { font-size: 13px; color: #344054; }
     .kv div:nth-child(2n) { color: #111; font-weight: 700; text-align: right; }
     input[type="number"] { width: 100%; padding: 12px; font-size: 16px; border-radius: 12px; border: 1px solid #d0d5dd; }
+    input[type="text"] { width: 100%; padding: 12px; font-size: 16px; border-radius: 12px; border: 1px solid #d0d5dd; }
     .note { font-size: 12px; color: #667085; margin-top: 8px; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; background: #f8fafc; border: 1px solid #e5e7eb; padding: 10px; border-radius: 12px; }
     .hidden { display: none; }
@@ -43,6 +44,7 @@
 </head>
 <body>
   <div class="wrap">
+
     <!-- ホーム（会員証） -->
     <div id="home" class="card">
       <p class="muted" id="hello">読み込み中...</p>
@@ -76,6 +78,26 @@
       <p class="note">※ 開発中：Vercelのメモリ保存のため、環境更新でポイント/交換履歴がリセットされることがあります（本番はDB化します）。</p>
     </div>
 
+    <!-- 氏名登録（初回のみ） -->
+    <div id="profile" class="card hidden">
+      <h1 class="title">お名前の登録（初回のみ）</h1>
+      <p class="muted">ポイント付与の前に、お名前を登録してください（漢字推奨）</p>
+
+      <div style="margin-top:12px;">
+        <input id="lastName" type="text" placeholder="苗字（例：山田）" />
+        <div style="height:10px;"></div>
+        <input id="firstName" type="text" placeholder="名前（例：太郎）" />
+        <p class="note">※ 次回以降は入力不要です</p>
+      </div>
+
+      <button class="btn btn-primary" id="saveProfile" style="margin-top:12px;">登録して進む</button>
+      <button class="btn btn-ghost" id="cancelProfile">戻る</button>
+
+      <div class="hr"></div>
+      <p class="muted" style="margin:0 0 6px;">ログ</p>
+      <div id="profileLog" class="mono">準備中…</div>
+    </div>
+
     <!-- 金額入力（申請→承認QR→付与） -->
     <div id="amount" class="card hidden">
       <h1 class="title">金額入力</h1>
@@ -98,6 +120,7 @@
         APPROVE:v1:STORE=1:TYPE=STATIC
       </p>
     </div>
+
   </div>
 
   <script>
@@ -111,20 +134,27 @@
       toNext: 0,
       rank: "レギュラー",
 
-      rewardThresholds: [],  // 例: [50,100]
-      claimedRewards: [],    // 例: [50]
+      rewardThresholds: [],
+      claimedRewards: [],
 
       requestId: null,
       amount: 0,
       expectedPt: 0,
+
+      profile: null,
     };
 
     function setLog(text) {
       document.getElementById("log").textContent = text;
     }
 
+    function setProfileLog(text) {
+      document.getElementById("profileLog").textContent = text;
+    }
+
     function show(screenId) {
       document.getElementById("home").classList.add("hidden");
+      document.getElementById("profile").classList.add("hidden");
       document.getElementById("amount").classList.add("hidden");
       document.getElementById(screenId).classList.remove("hidden");
     }
@@ -142,7 +172,6 @@
     }
 
     function rewardName(th) {
-      // 例：50pt=景品1、100pt=景品2…（必要なら名称を自由に変えられます）
       const idx = th / 50;
       return `景品 ${idx}`;
     }
@@ -195,7 +224,6 @@
         wrap.appendChild(card);
       });
 
-      // ボタンにイベントを付与
       wrap.querySelectorAll("button[data-th]").forEach((btn) => {
         btn.addEventListener("click", async () => {
           const th = Number(btn.getAttribute("data-th"));
@@ -222,6 +250,20 @@
       return data;
     }
 
+    async function ensureProfile() {
+      if (!state.userId) return false;
+
+      const r = await apiGet(`/api/profile/get?userId=${encodeURIComponent(state.userId)}`);
+      state.profile = r.profile;
+
+      if (state.profile) {
+        state.displayName = `${state.profile.last_name} ${state.profile.first_name}`;
+        renderHome();
+        return true;
+      }
+      return false;
+    }
+
     async function refreshBalance() {
       if (!state.userId) return;
 
@@ -240,7 +282,6 @@
       try {
         if (!state.userId) return;
 
-        // ここで確認ダイアログ（誤操作防止）
         const ok = window.confirm(`${rewardName(threshold)}（${threshold}pt到達）を交換しますか？`);
         if (!ok) return;
 
@@ -249,7 +290,6 @@
           threshold
         });
 
-        // 交換済み更新 → 最新残高/一覧も取り直す
         state.claimedRewards = r.claimed || [];
         await refreshBalance();
 
@@ -269,10 +309,59 @@
     }
 
     function setupUI() {
-      document.getElementById("goAmount").addEventListener("click", () => {
-        setLog("金額を入力して「申請する」を押してください");
-        show("amount");
+      document.getElementById("goAmount").addEventListener("click", async () => {
+        try {
+          if (!state.userId) { setLog("ユーザーID未取得です（LINE内で開いてください）"); return; }
+
+          // 初回だけ：氏名がなければ登録へ
+          const ok = await ensureProfile();
+          if (!ok) {
+            setProfileLog("苗字・名前を入力して「登録して進む」を押してください");
+            show("profile");
+            return;
+          }
+
+          setLog("金額を入力して「申請する」を押してください");
+          show("amount");
+        } catch (e) {
+          setLog("プロフィール確認エラー: " + JSON.stringify(e?.data || e));
+        }
       });
+
+      document.getElementById("cancelProfile").addEventListener("click", () => show("home"));
+
+      document.getElementById("saveProfile").addEventListener("click", async () => {
+        try {
+          if (!state.userId) return;
+
+          const last = (document.getElementById("lastName").value || "").trim();
+          const first = (document.getElementById("firstName").value || "").trim();
+
+          if (!last || !first) {
+            setProfileLog("苗字・名前を入力してください");
+            return;
+          }
+
+          setProfileLog("登録中…");
+          await apiPost("/api/profile/save", { user_id: state.userId, last_name: last, first_name: first });
+
+          // 登録後に再取得して home 表示更新
+          await ensureProfile();
+
+          setProfileLog("登録完了 ✅ 金額入力へ進みます");
+          setLog("金額を入力して「申請する」を押してください");
+          show("amount");
+        } catch (e) {
+          if (e?.status === 409) {
+            // すでに登録済みでも進む
+            await ensureProfile();
+            show("amount");
+            return;
+          }
+          setProfileLog("登録エラー: " + JSON.stringify(e?.data || e));
+        }
+      });
+
       document.getElementById("backHome").addEventListener("click", () => show("home"));
 
       document.getElementById("refresh").addEventListener("click", async () => {
@@ -327,7 +416,6 @@
             return;
           }
 
-          // QR読み取り（scanCodeV2優先）
           let approveQr = null;
           if (typeof liff.scanCodeV2 === "function") {
             setLog("カメラ起動中…（QRを読み取ってください）");
@@ -351,7 +439,6 @@
             approveQr
           });
 
-          // 付与結果でUI更新
           state.points = a.balance;
           state.redeemableCount = a.redeemableCount;
           state.toNext = a.toNext;
@@ -361,7 +448,6 @@
             `付与成功 ✅\nstoreId=${a.award.storeId}\npt=${a.award.pt}\n新残高=${a.balance}\n\nホームに戻って確認できます`
           );
 
-          // 付与後に最新の景品一覧も取得
           await refreshBalance();
         } catch (e) {
           if (e?.status === 409 && e?.data?.error === "ALREADY_AWARDED_TODAY") {
@@ -378,7 +464,7 @@
       renderHome();
 
       try {
-        await liff.init({ liffId: "2008691733-iSoNx2PY" });
+        await liff.init({ liffId: LIFF_ID });
 
         if (!liff.isLoggedIn()) {
           liff.login();
@@ -388,6 +474,9 @@
         const p = await liff.getProfile();
         state.displayName = p.displayName || "—";
         state.userId = p.userId;
+
+        // 登録済みなら漢字氏名に上書き
+        await ensureProfile();
 
         renderHome();
 
@@ -404,3 +493,7 @@
   </script>
 </body>
 </html>
+
+</body>
+</html>
+
