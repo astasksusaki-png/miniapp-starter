@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     if (!userId) return json(res, 400, { ok: false, error: "userId is required" });
 
     const th = Math.trunc(Number(threshold));
-    const sb = await supabaseAdmin();
+   const sb = supabaseAdmin();
 
     const { error } = await sb.rpc("redeem_reward", { p_user_id: userId, p_threshold: th });
 
