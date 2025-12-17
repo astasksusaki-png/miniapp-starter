@@ -18,14 +18,12 @@
     .btn-primary { background: #06c755; color: #fff; }
     .btn-ghost { background: #f1f3f5; color: #111; margin-top: 10px; }
     .btn-warn { background: #111; color: #fff; margin-top: 10px; }
-    .btn-disabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; }
     .hr { height: 1px; background: #eceff3; margin: 14px 0; }
     .badge { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #eefaf2; color: #137a3a; font-size: 12px; font-weight: 700; }
     .kv { display: grid; grid-template-columns: 1fr auto; gap: 8px 10px; margin-top: 10px; }
     .kv div { font-size: 13px; color: #344054; }
     .kv div:nth-child(2n) { color: #111; font-weight: 700; text-align: right; }
-    input[type="number"] { width: 100%; padding: 12px; font-size: 16px; border-radius: 12px; border: 1px solid #d0d5dd; }
-    input[type="text"] { width: 100%; padding: 12px; font-size: 16px; border-radius: 12px; border: 1px solid #d0d5dd; }
+    input[type="number"], input[type="text"] { width: 100%; padding: 12px; font-size: 16px; border-radius: 12px; border: 1px solid #d0d5dd; }
     .note { font-size: 12px; color: #667085; margin-top: 8px; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; background: #f8fafc; border: 1px solid #e5e7eb; padding: 10px; border-radius: 12px; }
     .hidden { display: none; }
@@ -40,20 +38,6 @@
     .smallBtn { margin-top: 10px; padding: 12px; border-radius: 12px; border: 0; width: 100%; font-weight: 800; cursor: pointer; }
     .smallBtnPrimary { background: #06c755; color: #fff; }
     .smallBtnDisabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; }
- /* ★タップが効かない対策：ボタンを最前面にする */
-#goAmount, #refresh, #apply, #scanApprove, #backHome, #saveProfile, #cancelProfile {
-  position: relative;
-  z-index: 9999;
-  pointer-events: auto;
-}
-
-/* もし透明なレイヤーが被っていても影響を減らす */
-.card, .wrap {
-  position: relative;
-}
-* { outline: 0; }
-#goAmount { outline: 3px solid red; }
-
   </style>
 </head>
 <body>
@@ -80,8 +64,8 @@
 
       <div class="hr"></div>
 
-    <button class="btn btn-primary" id="goAmount">金額入力してポイント申請</button>
-<button class="btn btn-ghost" id="refresh">残高を更新</button>
+      <button class="btn btn-primary" id="goAmount">金額入力してポイント申請</button>
+      <button class="btn btn-ghost" id="refresh">残高を更新</button>
 
       <div class="hr"></div>
 
@@ -89,7 +73,7 @@
       <p class="muted">50ptごとに景品と交換できます（到達分だけ表示されます）</p>
       <div id="rewards" class="rewards"></div>
 
-      <p class="note">※ 開発中：Vercelのメモリ保存のため、環境更新でポイント/交換履歴がリセットされることがあります（本番はDB化します）。</p>
+      <p class="note">※ 開発中：環境更新でポイント/交換履歴がリセットされることがあります（本番はDB化します）。</p>
     </div>
 
     <!-- 氏名登録（初回のみ） -->
@@ -138,28 +122,10 @@
   </div>
 
   <script>
-// ★JSが動いているか/どこで止まっているかをアラートで出す
-alert("SCRIPT START");
-
-window.addEventListener("error", (e) => {
-  alert("JS ERROR: " + (e.message || e.type));
-});
-window.addEventListener("unhandledrejection", (e) => {
-  alert("PROMISE ERROR: " + (e.reason?.message || String(e.reason)));
-});
-
     const LIFF_ID = "2008691733-iSoNx2PY";
 
     const state = {
-    // ★デバッグ：ボタンが押されているか確認
-window.addEventListener("load", () => {
-  const btn = document.getElementById("goAmount");
-  if (!btn) return;
-  btn.addEventListener("click", () => {
-    alert("goAmount clicked"); // ← 押したら必ず出る
-  });
-});
-  displayName: "—",
+      displayName: "—",
       userId: null,
       points: 0,
       redeemableCount: 0,
@@ -179,7 +145,6 @@ window.addEventListener("load", () => {
     function setLog(text) {
       document.getElementById("log").textContent = text;
     }
-
     function setProfileLog(text) {
       document.getElementById("profileLog").textContent = text;
     }
@@ -345,7 +310,6 @@ window.addEventListener("load", () => {
         try {
           if (!state.userId) { setLog("ユーザーID未取得です（LINE内で開いてください）"); return; }
 
-          // 初回だけ：氏名がなければ登録へ
           const ok = await ensureProfile();
           if (!ok) {
             setProfileLog("苗字・名前を入力して「登録して進む」を押してください");
@@ -377,7 +341,6 @@ window.addEventListener("load", () => {
           setProfileLog("登録中…");
           await apiPost("/api/profile/save", { user_id: state.userId, last_name: last, first_name: first });
 
-          // 登録後に再取得して home 表示更新
           await ensureProfile();
 
           setProfileLog("登録完了 ✅ 金額入力へ進みます");
@@ -385,7 +348,6 @@ window.addEventListener("load", () => {
           show("amount");
         } catch (e) {
           if (e?.status === 409) {
-            // すでに登録済みでも進む
             await ensureProfile();
             show("amount");
             return;
@@ -414,7 +376,6 @@ window.addEventListener("load", () => {
         calcPt.textContent = `${pt}pt`;
       });
 
-      // 申請API
       document.getElementById("apply").addEventListener("click", async () => {
         try {
           if (!state.userId) { setLog("ユーザーID未取得です（LINE内で開いてください）"); return; }
@@ -437,7 +398,6 @@ window.addEventListener("load", () => {
         }
       });
 
-      // 承認QR読み取り → 付与API
       document.getElementById("scanApprove").addEventListener("click", async () => {
         try {
           if (!state.userId) { setLog("ユーザーID未取得です"); return; }
@@ -493,7 +453,6 @@ window.addEventListener("load", () => {
 
     async function main() {
       setupUI();
-      alert("setupUI ran");
       renderHome();
 
       try {
@@ -508,7 +467,6 @@ window.addEventListener("load", () => {
         state.displayName = p.displayName || "—";
         state.userId = p.userId;
 
-        // 登録済みなら漢字氏名に上書き
         await ensureProfile();
 
         renderHome();
@@ -522,37 +480,7 @@ window.addEventListener("load", () => {
       }
     }
 
-    main();// ★デバッグ：タップしている要素を特定（ボタンが押せない原因探し）
-window.addEventListener("load", () => {
-  document.addEventListener("click", (e) => {
-    const x = e.clientX, y = e.clientY;
-    const topEl = document.elementFromPoint(x, y);
-    alert(
-      "クリック先: " +
-      (topEl ? `${topEl.tagName}#${topEl.id}.${topEl.className}` : "null")
-    );
-  }, true);
-});
-window.addEventListener("load", () => {
-  alert("CALLING MAIN");
-  try {
     main();
-  } catch (e) {
-    alert("MAIN CRASH: " + (e?.message || String(e)));
-  }
-});
-
   </script>
 </body>
 </html>
-
-</body>
-</html>
-
-
-
-
-
-
-
-
