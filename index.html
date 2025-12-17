@@ -511,13 +511,25 @@ window.addEventListener("load", () => {
       }
     }
 
-    main();
+    main();// ★デバッグ：タップしている要素を特定（ボタンが押せない原因探し）
+window.addEventListener("load", () => {
+  document.addEventListener("click", (e) => {
+    const x = e.clientX, y = e.clientY;
+    const topEl = document.elementFromPoint(x, y);
+    alert(
+      "クリック先: " +
+      (topEl ? `${topEl.tagName}#${topEl.id}.${topEl.className}` : "null")
+    );
+  }, true);
+});
+
   </script>
 </body>
 </html>
 
 </body>
 </html>
+
 
 
 
