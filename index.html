@@ -64,10 +64,9 @@
 
       <div class="hr"></div>
 
-     <button class="btn btn-primary" id="goAmount" onclick="goAmountClick()">金額入力してポイント申請</button>
-
-<button class="btn btn-ghost" id="refresh" onclick="refreshClick()">残高を更新</button>
-
+      <!-- ★onclickで統一 -->
+      <button class="btn btn-primary" id="goAmount" onclick="goAmountClick()">金額入力してポイント申請</button>
+      <button class="btn btn-ghost" id="refresh" onclick="refreshClick()">残高を更新</button>
 
       <div class="hr"></div>
 
@@ -133,14 +132,11 @@
       redeemableCount: 0,
       toNext: 0,
       rank: "レギュラー",
-
       rewardThresholds: [],
       claimedRewards: [],
-
       requestId: null,
       amount: 0,
       expectedPt: 0,
-
       profile: null,
     };
 
@@ -284,14 +280,12 @@
         const ok = window.confirm(`${rewardName(threshold)}（${threshold}pt到達）を交換しますか？`);
         if (!ok) return;
 
-        const r = await apiPost("/api/redeem", {
-          userId: state.userId,
-          threshold
-        });
+        const r = await apiPost("/api/redeem", { userId: state.userId, threshold });
 
         state.claimedRewards = r.claimed || [];
         await refreshBalance();
 
+        // 本番ではここも任意（アラート不要なら消してOK）
         alert("交換を受け付けました。スタッフに画面を見せてください。");
       } catch (e) {
         if (e?.status === 409 && e?.data?.error === "ALREADY_REDEEMED") {
@@ -307,25 +301,39 @@
       }
     }
 
-    function setupUI() {
-      document.getElementById("goAmount").addEventListener("click", async () => {
-        try {
-          if (!state.userId) { setLog("ユーザーID未取得です（LINE内で開いてください）"); return; }
-
-          const ok = await ensureProfile();
-          if (!ok) {
-            setProfileLog("苗字・名前を入力して「登録して進む」を押してください");
-            show("profile");
-            return;
-          }
-
-          setLog("金額を入力して「申請する」を押してください");
-          show("amount");
-        } catch (e) {
-          setLog("プロフィール確認エラー: " + JSON.stringify(e?.data || e));
+    // ★HTML onclick 用（本番版：alertなし）
+    async function goAmountClick() {
+      try {
+        if (!state.userId) {
+          document.getElementById("hello").textContent = "ログイン処理中です。少し待ってから再度お試しください。";
+          return;
         }
-      });
 
+        const ok = await ensureProfile();
+        if (!ok) {
+          setProfileLog("苗字・名前を入力して「登録して進む」を押してください");
+          show("profile");
+          return;
+        }
+
+        setLog("金額を入力して「申請する」を押してください");
+        show("amount");
+      } catch (e) {
+        document.getElementById("hello").textContent = "申請画面の表示エラー: " + JSON.stringify(e?.data || e);
+      }
+    }
+
+    async function refreshClick() {
+      try {
+        setLog("残高更新中…");
+        await refreshBalance();
+        setLog("残高を更新しました");
+      } catch (e) {
+        setLog("残高更新エラー: " + JSON.stringify(e?.data || e));
+      }
+    }
+
+    function setupUI() {
       document.getElementById("cancelProfile").addEventListener("click", () => show("home"));
 
       document.getElementById("saveProfile").addEventListener("click", async () => {
@@ -359,16 +367,6 @@
       });
 
       document.getElementById("backHome").addEventListener("click", () => show("home"));
-
-      document.getElementById("refresh").addEventListener("click", async () => {
-        try {
-          setLog("残高更新中…");
-          await refreshBalance();
-          setLog("残高を更新しました");
-        } catch (e) {
-          setLog("残高更新エラー: " + JSON.stringify(e?.data || e));
-        }
-      });
 
       const yen = document.getElementById("yen");
       const calcPt = document.getElementById("calcPt");
@@ -481,56 +479,8 @@
         setLog("LIFF初期化エラー：" + (e?.message || e));
       }
     }
-// ★HTML onclick 用：クリックが必ず動くようにする
-async function goAmountClick() {
-  const hello = document.getElementById("hello");
-
-  try {
-    // クリックされたことをホームに表示
-    hello.textContent = "申請ボタン押下：確認中…";
-
-    if (!state.userId) {
-      alert("ユーザーID未取得です（LIFFログイン/初期化待ち）");
-      hello.textContent = "ユーザーID未取得です（少し待ってから再度お試しください）";
-      return;
-    }
-
-    // まずプロフィール確認（ここで失敗すると今まで何も表示されなかった）
-    const ok = await ensureProfile();
-
-    if (!ok) {
-      // 未登録なら氏名入力へ
-      setProfileLog("苗字・名前を入力して「登録して進む」を押してください");
-      show("profile");
-      return;
-    }
-
-    // 登録済みなら金額入力へ
-    setLog("金額を入力して「申請する」を押してください");
-    show("amount");
-  } catch (e) {
-    // ★ホームにも出す（これが重要）
-    const msg = "goAmountClick エラー: " + JSON.stringify(e?.data || e);
-    alert(msg);
-    hello.textContent = msg;
-  }
-}
-
-
-async function refreshClick() {
-  try {
-    setLog("残高更新中…");
-    await refreshBalance();
-    setLog("残高を更新しました");
-  } catch (e) {
-    setLog("refreshClick エラー: " + JSON.stringify(e?.data || e));
-  }
-}
 
     main();
   </script>
 </body>
 </html>
-
-
-
