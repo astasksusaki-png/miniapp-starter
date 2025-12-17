@@ -18,6 +18,7 @@
     .btn-primary { background: #06c755; color: #fff; }
     .btn-ghost { background: #f1f3f5; color: #111; margin-top: 10px; }
     .btn-warn { background: #111; color: #fff; margin-top: 10px; }
+    .btn-disabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; }
     .hr { height: 1px; background: #eceff3; margin: 14px 0; }
     .badge { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #eefaf2; color: #137a3a; font-size: 12px; font-weight: 700; }
     .kv { display: grid; grid-template-columns: 1fr auto; gap: 8px 10px; margin-top: 10px; }
@@ -64,7 +65,7 @@
 
       <div class="hr"></div>
 
-      <!-- ★onclickで統一 -->
+      <!-- ★ここは onclick 方式で統一 -->
       <button class="btn btn-primary" id="goAmount" onclick="goAmountClick()">金額入力してポイント申請</button>
       <button class="btn btn-ghost" id="refresh" onclick="refreshClick()">残高を更新</button>
 
@@ -190,7 +191,6 @@
       }
 
       const claimedSet = new Set(state.claimedRewards || []);
-
       state.rewardThresholds.forEach((th) => {
         const claimed = claimedSet.has(th);
 
@@ -215,7 +215,6 @@
           </div>
           ${btnHtml}
         `;
-
         wrap.appendChild(card);
       });
 
@@ -247,7 +246,6 @@
 
     async function ensureProfile() {
       if (!state.userId) return false;
-
       const r = await apiGet(`/api/profile/get?userId=${encodeURIComponent(state.userId)}`);
       state.profile = r.profile;
 
@@ -261,15 +259,12 @@
 
     async function refreshBalance() {
       if (!state.userId) return;
-
       const data = await apiGet(`/api/me?userId=${encodeURIComponent(state.userId)}`);
       state.points = data.points || 0;
       state.redeemableCount = data.redeemableCount || 0;
       state.toNext = data.toNext || 0;
-
       state.rewardThresholds = data.rewardThresholds || [];
       state.claimedRewards = data.claimedRewards || [];
-
       renderHome();
     }
 
@@ -281,11 +276,9 @@
         if (!ok) return;
 
         const r = await apiPost("/api/redeem", { userId: state.userId, threshold });
-
         state.claimedRewards = r.claimed || [];
         await refreshBalance();
 
-        // 本番ではここも任意（アラート不要なら消してOK）
         alert("交換を受け付けました。スタッフに画面を見せてください。");
       } catch (e) {
         if (e?.status === 409 && e?.data?.error === "ALREADY_REDEEMED") {
@@ -301,11 +294,14 @@
       }
     }
 
-    // ★HTML onclick 用（本番版：alertなし）
+    // ★ここから：onclick 用（goAmount / refresh）
     async function goAmountClick() {
       try {
+        const hello = document.getElementById("hello");
+        if (hello) hello.textContent = "申請ボタン押下：確認中…";
+
         if (!state.userId) {
-          document.getElementById("hello").textContent = "ログイン処理中です。少し待ってから再度お試しください。";
+          if (hello) hello.textContent = "ユーザーID未取得です（LIFF初期化待ち。少し待って再度お試しください）";
           return;
         }
 
@@ -319,22 +315,25 @@
         setLog("金額を入力して「申請する」を押してください");
         show("amount");
       } catch (e) {
-        document.getElementById("hello").textContent = "申請画面の表示エラー: " + JSON.stringify(e?.data || e);
+        const msg = "goAmountClick エラー: " + JSON.stringify(e?.data || e);
+        const hello = document.getElementById("hello");
+        if (hello) hello.textContent = msg;
       }
     }
 
     async function refreshClick() {
       try {
-        setLog("残高更新中…");
         await refreshBalance();
-        setLog("残高を更新しました");
       } catch (e) {
-        setLog("残高更新エラー: " + JSON.stringify(e?.data || e));
+        const hello = document.getElementById("hello");
+        if (hello) hello.textContent = "残高更新エラー: " + JSON.stringify(e?.data || e);
       }
     }
 
+    // ★その他のボタンは setupUI で addEventListener
     function setupUI() {
       document.getElementById("cancelProfile").addEventListener("click", () => show("home"));
+      document.getElementById("backHome").addEventListener("click", () => show("home"));
 
       document.getElementById("saveProfile").addEventListener("click", async () => {
         try {
@@ -342,31 +341,20 @@
 
           const last = (document.getElementById("lastName").value || "").trim();
           const first = (document.getElementById("firstName").value || "").trim();
-
-          if (!last || !first) {
-            setProfileLog("苗字・名前を入力してください");
-            return;
-          }
+          if (!last || !first) { setProfileLog("苗字・名前を入力してください"); return; }
 
           setProfileLog("登録中…");
           await apiPost("/api/profile/save", { user_id: state.userId, last_name: last, first_name: first });
 
           await ensureProfile();
-
           setProfileLog("登録完了 ✅ 金額入力へ進みます");
           setLog("金額を入力して「申請する」を押してください");
           show("amount");
         } catch (e) {
-          if (e?.status === 409) {
-            await ensureProfile();
-            show("amount");
-            return;
-          }
+          if (e?.status === 409) { await ensureProfile(); show("amount"); return; }
           setProfileLog("登録エラー: " + JSON.stringify(e?.data || e));
         }
       });
-
-      document.getElementById("backHome").addEventListener("click", () => show("home"));
 
       const yen = document.getElementById("yen");
       const calcPt = document.getElementById("calcPt");
@@ -468,15 +456,11 @@
         state.userId = p.userId;
 
         await ensureProfile();
-
         renderHome();
 
-        setLog("残高取得中…");
         await refreshBalance();
-        setLog("準備OK：金額入力へ進めます");
       } catch (e) {
         document.getElementById("hello").textContent = "LIFF初期化エラー：" + (e?.message || e);
-        setLog("LIFF初期化エラー：" + (e?.message || e));
       }
     }
 
