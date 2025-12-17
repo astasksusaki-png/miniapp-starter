@@ -138,6 +138,16 @@
   </div>
 
   <script>
+// ★JSが動いているか/どこで止まっているかをアラートで出す
+alert("SCRIPT START");
+
+window.addEventListener("error", (e) => {
+  alert("JS ERROR: " + (e.message || e.type));
+});
+window.addEventListener("unhandledrejection", (e) => {
+  alert("PROMISE ERROR: " + (e.reason?.message || String(e.reason)));
+});
+
     const LIFF_ID = "2008691733-iSoNx2PY";
 
     const state = {
@@ -523,6 +533,14 @@ window.addEventListener("load", () => {
     );
   }, true);
 });
+window.addEventListener("load", () => {
+  alert("CALLING MAIN");
+  try {
+    main();
+  } catch (e) {
+    alert("MAIN CRASH: " + (e?.message || String(e)));
+  }
+});
 
   </script>
 </body>
@@ -530,6 +548,7 @@ window.addEventListener("load", () => {
 
 </body>
 </html>
+
 
 
 
