@@ -483,22 +483,39 @@
     }
 // ★HTML onclick 用：クリックが必ず動くようにする
 async function goAmountClick() {
-  try {
-    if (!state.userId) { setLog("ユーザーID未取得です（LINE内で開いてください）"); return; }
+  const hello = document.getElementById("hello");
 
+  try {
+    // クリックされたことをホームに表示
+    hello.textContent = "申請ボタン押下：確認中…";
+
+    if (!state.userId) {
+      alert("ユーザーID未取得です（LIFFログイン/初期化待ち）");
+      hello.textContent = "ユーザーID未取得です（少し待ってから再度お試しください）";
+      return;
+    }
+
+    // まずプロフィール確認（ここで失敗すると今まで何も表示されなかった）
     const ok = await ensureProfile();
+
     if (!ok) {
+      // 未登録なら氏名入力へ
       setProfileLog("苗字・名前を入力して「登録して進む」を押してください");
       show("profile");
       return;
     }
 
+    // 登録済みなら金額入力へ
     setLog("金額を入力して「申請する」を押してください");
     show("amount");
   } catch (e) {
-    setLog("goAmountClick エラー: " + JSON.stringify(e?.data || e));
+    // ★ホームにも出す（これが重要）
+    const msg = "goAmountClick エラー: " + JSON.stringify(e?.data || e);
+    alert(msg);
+    hello.textContent = msg;
   }
 }
+
 
 async function refreshClick() {
   try {
@@ -514,5 +531,6 @@ async function refreshClick() {
   </script>
 </body>
 </html>
+
 
 
