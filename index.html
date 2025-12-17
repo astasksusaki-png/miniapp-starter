@@ -64,8 +64,9 @@
 
       <div class="hr"></div>
 
-      <button class="btn btn-primary" id="goAmount" onclick="alert('goAmount HTML onclick')">金額入力してポイント申請</button>
-<button class="btn btn-ghost" id="refresh" onclick="alert('refresh HTML onclick')">残高を更新</button>
+     <button class="btn btn-primary" id="goAmount" onclick="goAmountClick()">金額入力してポイント申請</button>
+
+<button class="btn btn-ghost" id="refresh" onclick="refreshClick()">残高を更新</button>
 
 
       <div class="hr"></div>
@@ -480,9 +481,38 @@
         setLog("LIFF初期化エラー：" + (e?.message || e));
       }
     }
+// ★HTML onclick 用：クリックが必ず動くようにする
+async function goAmountClick() {
+  try {
+    if (!state.userId) { setLog("ユーザーID未取得です（LINE内で開いてください）"); return; }
+
+    const ok = await ensureProfile();
+    if (!ok) {
+      setProfileLog("苗字・名前を入力して「登録して進む」を押してください");
+      show("profile");
+      return;
+    }
+
+    setLog("金額を入力して「申請する」を押してください");
+    show("amount");
+  } catch (e) {
+    setLog("goAmountClick エラー: " + JSON.stringify(e?.data || e));
+  }
+}
+
+async function refreshClick() {
+  try {
+    setLog("残高更新中…");
+    await refreshBalance();
+    setLog("残高を更新しました");
+  } catch (e) {
+    setLog("refreshClick エラー: " + JSON.stringify(e?.data || e));
+  }
+}
 
     main();
   </script>
 </body>
 </html>
+
 
