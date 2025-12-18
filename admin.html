@@ -166,7 +166,8 @@
           <td>${dt(r.awarded_at)}</td>
           <td>STORE ${r.store_id}</td>
           <td>${yen(r.amount)}</td>
-          <td>${pt(r.added_points)}</td><td>${row.name || ""}</td>
+          <td>${pt(r.added_points)}</td>
+          <td>${r.name || ""}</td>
           <td class="mono">${r.user_id}</td>
         `;
         tbody.appendChild(tr);
