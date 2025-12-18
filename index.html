@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ポイント会員証</title>
+  <title>OMOPO会員証</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
  *, *::before, *::after { box-sizing: border-box; }
@@ -51,7 +51,7 @@
 
       <div class="row">
         <div>
-          <h1 class="title">ポイント会員証</h1>
+          <h1 class="title">OMOPO会員証</h1>
           <span class="badge" id="rankBadge">ランク：—</span>
         </div>
         <div class="pt"><span id="points">0</span><small>pt</small></div>
@@ -76,7 +76,7 @@
       <p class="muted">50ptごとに景品と交換できます（到達分だけ表示されます）</p>
       <div id="rewards" class="rewards"></div>
 
-      <p class="note">※ 開発中：環境更新でポイント/交換履歴がリセットされることがあります（本番はDB化します）。</p>
+      <p class="note"></p>
     </div>
 
     <!-- 氏名登録（初回のみ） -->
@@ -158,7 +158,7 @@
 
     function renderHome() {
       document.getElementById("hello").textContent =
-        state.userId ? `こんにちは、${state.displayName} さん` : "ログイン中…";
+        state.userId ? `${state.displayName} さん、お疲れ様です！` : "ログイン中…";
 
       document.getElementById("points").textContent = String(state.points);
       document.getElementById("rankBadge").textContent = `ランク：${state.rank}`;
@@ -469,5 +469,6 @@
   </script>
 </body>
 </html>
+
 
 
