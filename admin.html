@@ -5,14 +5,16 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>管理画面：付与履歴</title>
   <style>
+    *, *::before, *::after { box-sizing: border-box; }
     body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; background: #f6f7f9; }
     .wrap { max-width: 980px; margin: 0 auto; padding: 16px; }
     .card { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 4px 16px rgba(0,0,0,.06); }
     .row { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
     label { font-size:12px; color:#475467; display:block; margin-bottom:6px; }
-    input, select { padding:10px; border-radius:10px; border:1px solid #d0d5dd; font-size:14px; }
+    input, select { padding:10px; border-radius:10px; border:1px solid #d0d5dd; font-size:14px; max-width: 100%; }
     button { padding:10px 14px; border:0; border-radius:10px; font-weight:800; cursor:pointer; }
     .btn { background:#111; color:#fff; }
+    .btnSub { background:#eef2f7; color:#111; border:1px solid #e5e7eb; }
     .muted { color:#667085; font-size:13px; }
     table { width:100%; border-collapse: collapse; margin-top:12px; }
     th, td { border-bottom:1px solid #eceff3; padding:10px; text-align:left; font-size:13px; }
@@ -49,6 +51,12 @@
           </select>
         </div>
 
+        <!-- ★追加：氏名検索 -->
+        <div>
+          <label>氏名（部分一致）</label>
+          <input id="nameQuery" type="text" placeholder="例：山田" style="width:160px" />
+        </div>
+
         <div>
           <label>from</label>
           <input id="from" type="date" />
@@ -65,6 +73,8 @@
         </div>
 
         <button class="btn" id="load">読み込み</button>
+        <!-- ★追加：CSV -->
+        <button class="btnSub" id="btnCsv" type="button">CSV</button>
       </div>
 
       <div id="kpi" class="kpi"></div>
@@ -72,8 +82,7 @@
       <table>
         <thead>
           <tr>
-           <th>日時</th><th>店舗</th><th>金額</th><th>付与pt</th><th>氏名</th><th>user_id</th>
-
+            <th>日時</th><th>店舗</th><th>金額</th><th>付与pt</th><th>氏名</th><th>user_id</th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -85,7 +94,7 @@
     </div>
   </div>
 
- <script>
+<script>
   const qs = new URLSearchParams(location.search);
   const el = (id) => document.getElementById(id);
 
@@ -110,6 +119,45 @@
     }
     box.textContent = msg;
   }
+
+  // ---- CSV ----
+  function csvEscape(v) {
+    const s = String(v ?? "");
+    if (/[,"\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  }
+
+  function rowsToCsv(rows) {
+    const header = ["日時","店舗","金額","付与pt","氏名","user_id"];
+    const lines = [header.join(",")];
+
+    for (const r of (rows || [])) {
+      lines.push([
+        csvEscape(dt(r.awarded_at)),
+        csvEscape(`STORE ${r.store_id}`),
+        csvEscape(r.amount),
+        csvEscape(r.added_points),
+        csvEscape(r.name || ""),
+        csvEscape(r.user_id || "")
+      ].join(","));
+    }
+    return lines.join("\n");
+  }
+
+  function downloadCsv(filename, csvText) {
+    const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // 最後に表示した行（CSV用）
+  window.__lastRows = [];
 
   async function load() {
     try {
@@ -144,11 +192,19 @@
         return;
       }
 
-      // KPI
-      const summary = data.summary || {
-        totalAwards: data.rows?.length || 0,
-        totalPoints: (data.rows||[]).reduce((s,r)=>s+(r.added_points||0),0),
-        totalAmount: (data.rows||[]).reduce((s,r)=>s+(r.amount||0),0),
+      const rows = data.rows || [];
+
+      // ★追加：氏名でフィルタ（部分一致）
+      const qName = (el("nameQuery").value || "").trim().toLowerCase();
+      const filtered = qName
+        ? rows.filter(r => String(r.name || "").toLowerCase().includes(qName))
+        : rows;
+
+      // KPI（表示対象 filtered で集計）
+      const summary = {
+        totalAwards: filtered.length,
+        totalPoints: filtered.reduce((s,r)=>s+(r.added_points||0),0),
+        totalAmount: filtered.reduce((s,r)=>s+(r.amount||0),0),
       };
 
       el("kpi").innerHTML = `
@@ -157,10 +213,10 @@
         <div><div class="muted">合計金額</div><b>${yen(summary.totalAmount)}</b></div>
       `;
 
-      // Table
+      // Table（filtered を表示）
       const tbody = el("tbody");
       tbody.innerHTML = "";
-      for (const r of data.rows) {
+      for (const r of filtered) {
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${dt(r.awarded_at)}</td>
@@ -173,7 +229,13 @@
         tbody.appendChild(tr);
       }
 
-      setStatus("読み込み成功（" + (data.rows?.length || 0) + "件）");
+      // CSV用に保存
+      window.__lastRows = filtered;
+
+      setStatus(
+        "読み込み成功（" + filtered.length + "件）\n" +
+        (qName ? "※氏名フィルタ適用中: " + qName : "")
+      );
     } catch (e) {
       setStatus("JSエラーで停止しました:\n" + (e?.stack || String(e)));
     }
@@ -181,6 +243,18 @@
 
   // ボタン動作
   el("load").addEventListener("click", load);
+
+  // CSVボタン
+  el("btnCsv").addEventListener("click", () => {
+    const rows = window.__lastRows || [];
+    if (!rows.length) {
+      alert("CSVにするデータがありません（先に読み込みしてください）");
+      return;
+    }
+    const csv = rowsToCsv(rows);
+    const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
+    downloadCsv(`awards_${ts}.csv`, csv);
+  });
 
   // URL token があれば自動反映して自動読み込み
   window.addEventListener("load", () => {
