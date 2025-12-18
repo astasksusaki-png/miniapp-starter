@@ -72,11 +72,8 @@
       <table>
         <thead>
           <tr>
-            <th>日時</th>
-            <th>店舗</th>
-            <th>金額</th>
-            <th>付与pt</th>
-            <th>user_id</th>
+           <th>日時</th><th>店舗</th><th>金額</th><th>付与pt</th><th>氏名</th><th>user_id</th>
+
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -169,7 +166,7 @@
           <td>${dt(r.awarded_at)}</td>
           <td>STORE ${r.store_id}</td>
           <td>${yen(r.amount)}</td>
-          <td>${pt(r.added_points)}</td>
+          <td>${pt(r.added_points)}</td><td>${row.name || ""}</td>
           <td class="mono">${r.user_id}</td>
         `;
         tbody.appendChild(tr);
