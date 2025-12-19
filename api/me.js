@@ -11,10 +11,10 @@ function buildRewardThresholds(points) {
 
 function calcRank(total) {
   const t = Number(total) || 0;
-  if (t >= 201) return "ゴールド";
-  if (t >= 151) return "プラチナ";
-  if (t >= 101) return "シルバー";
-  if (t >= 51) return "ブロンズ";
+   if (total >= 201) return "ダイヤモンド";
+  if (total >= 151) return "プラチナ";
+  if (total >= 101) return "ゴールド";
+  if (total >= 51)  return "シルバー";
   return "レギュラー";
 }
 
