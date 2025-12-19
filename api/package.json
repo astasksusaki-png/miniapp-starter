@@ -1,7 +1,0 @@
-{
-  "name": "miniapp-starter",
-  "private": true,
-"dependencies": {
-  "@supabase/supabase-js": "1.35.7"
-}
-}
