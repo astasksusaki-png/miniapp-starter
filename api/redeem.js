@@ -9,21 +9,27 @@ export default async function handler(req, res) {
     if (!userId) return json(res, 400, { ok: false, error: "userId is required" });
 
     const th = Math.trunc(Number(threshold));
-   const sb = supabaseAdmin();
+    if (!Number.isFinite(th) || th <= 0) return json(res, 400, { ok: false, error: "threshold must be > 0" });
 
-    const { error } = await sb.rpc("redeem_reward", { p_user_id: userId, p_threshold: th });
+    const sb = supabaseAdmin();
+
+    const { data, error } = await sb.rpc("redeem_reward", {
+      p_user_id: userId,
+      p_threshold: th
+    });
 
     if (error) {
-      if (String(error.message || "").includes("duplicate key")) {
+      const msg = String(error.message || "");
+      if (msg.includes("ALREADY_REDEEMED") || msg.includes("duplicate key")) {
         return json(res, 409, { ok: false, error: "ALREADY_REDEEMED", threshold: th });
       }
-      if (String(error.message || "").includes("NOT_ENOUGH_POINTS")) {
+      if (msg.includes("NOT_ENOUGH_POINTS")) {
         return json(res, 400, { ok: false, error: "NOT_ENOUGH_POINTS" });
       }
-      return json(res, 400, { ok: false, error: String(error.message || error) });
+      return json(res, 400, { ok: false, error: msg });
     }
 
-    return json(res, 200, { ok: true, threshold: th });
+    return json(res, 200, { ok: true, threshold: th, spent: data?.spent ?? th });
   } catch (e) {
     return json(res, 500, { ok: false, error: e?.message || String(e) });
   }
