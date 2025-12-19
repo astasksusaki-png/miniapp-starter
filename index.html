@@ -150,12 +150,12 @@
     };
 
     // ★ランク判定（累計ポイントで決まる）
-   function calcRank(p) {
-  if (p <= 50) return "レギュラー";
-  if (p <= 100) return "シルバー";
-  if (p <= 150) return "ゴールド";
-  if (p <= 200) return "プラチナ";
-  return "ダイヤモンド";
+function calcRank(total) {
+  if (total >= 201) return "ダイヤモンド";
+  if (total >= 151) return "プラチナ";
+  if (total >= 101) return "ゴールド";
+  if (total >= 51)  return "シルバー";
+  return "レギュラー";
 }
 
     function setLog(text) { document.getElementById("log").textContent = text; }
@@ -493,6 +493,7 @@ function renderHome() {
   </script>
 </body>
 </html>
+
 
 
 
