@@ -187,10 +187,18 @@ function renderHome() {
 
 
 
-    function rewardName(th) {
-      const idx = th / 50;
-      return `景品 ${idx}`;
-    }
+  const REWARDS = {
+  50:  "景品：クオカード５００円分",
+  100: "景品：クオカード５００円分＋オリジナルグッズ",
+  150: "景品：クオカード５００円分",
+  200: "景品：クオカード５００円分＋シークレットギフト",
+  250: "景品：？？？",
+};
+
+function rewardName(th) {
+  return REWARDS[th] || `景品（${th}pt）`;
+}
+
 
     function renderRewards() {
       const wrap = document.getElementById("rewards");
@@ -499,6 +507,7 @@ async function refreshBalance() {
   </script>
 </body>
 </html>
+
 
 
 
