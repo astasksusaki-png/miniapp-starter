@@ -21,7 +21,9 @@ function calcRank(total) {
 // 交換履歴（reward_claims が無い/列名違いでも落ちないように）
 async function getClaimedThresholds(sb, userId) {
   const tableCandidates = [
-    "reward_claims",       // まず本命
+    "threshold"
+    "rewards_claimed"
+    "reward_claims",      
     "reward_redemptions",
     "reward_redeems",
     "redeems",
