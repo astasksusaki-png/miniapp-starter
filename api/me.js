@@ -117,19 +117,19 @@ export default async function handler(req, res) {
     const nextTh = (Math.floor(points / 50) + 1) * 50;
     const toNext = nextTh - points;
 
-    // 6) 累計ポイント（交換で減らない）＝ランク判定用
-    const lifetimePoints = await getLifetimePoints(sb, userId);
+   // 6) 累計ポイント（交換で減らない）＝ランク判定用
+let lifetimePoints = 0;
+{
+  const { data: rows, error } = await sb
+    .from("point_awards")
+    .select("added_points")
+    .eq("user_id", userId);
 
-    return json(res, 200, {
-      ok: true,
-      points,
-      redeemableCount,
-      toNext,
-      rewardThresholds,
-      claimedRewards,
-      lifetimePoints,
-    });
-  } catch (e) {
-    return json(res, 500, { ok: false, error: String(e?.message || e) });
-  }
+  if (error) return json(res, 500, { ok: false, error: error.message });
+
+  lifetimePoints = (rows || []).reduce(
+    (sum, r) => sum + Number(r.added_points || 0),
+    0
+  );
 }
+
