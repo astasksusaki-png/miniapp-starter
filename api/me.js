@@ -93,10 +93,12 @@ export default async function handler(req, res) {
 
     // 2) 累計（交換で減らない：point_awards 合計）
     const lifetimePoints = await getLifetimePoints(sb, userId);
+// redemptionでpointsが減っても、累計が残高より小さくなるのはおかしいので補正
+const lifetimeFixed = Math.max(lifetimePoints, points);
 
     // 3) ランク（累計で判定）
-    const rank = calcRank(lifetimePoints);
-
+const rank = calcRank(lifetimeFixed);
+    
     // 4) 交換済み（存在しないテーブルでも落とさない）
     let claimedRewards = [];
     try {
@@ -121,6 +123,7 @@ export default async function handler(req, res) {
       userId,
       points,
       lifetimePoints,
+     lifetimeFixed,
       rank,
       rewardThresholds,
       claimedRewards,
