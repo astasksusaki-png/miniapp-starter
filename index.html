@@ -54,6 +54,7 @@
         <div>
           <h1 class="title">OMOPO会員証</h1>
           <span class="badge" id="rankBadge">ランク：—</span>
+  <div id="lifetime" class="muted" style="margin-top:6px;"></div>
         </div>
         <div class="pt"><span id="points">0</span><small>pt</small></div>
       </div>
@@ -156,7 +157,7 @@
       if (p >= 151) return "プラチナ";
       if (p >= 101) return "ゴールド";
       if (p >= 51)  return "シルバー";
-      return "レギュラー";
+      if (p >= 1)  return "レギュラー";
     }
 
     function setLog(text) { document.getElementById("log").textContent = text; }
@@ -169,21 +170,23 @@
       document.getElementById(screenId).classList.remove("hidden");
     }
 
-    function renderHome() {
-      document.getElementById("hello").textContent =
-        state.userId ? `${state.displayName} さん、お疲れ様です！` : "ログイン中…";
+   function renderHome() {
+  document.getElementById("hello").textContent =
+    state.userId ? `${state.displayName} さん、お疲れ様です！` : "ログイン中…";
 
-      document.getElementById("points").textContent = String(state.points);
-      document.getElementById("rankBadge").textContent = `ランク：${state.rank}`;
-      document.getElementById("redeemable").textContent = `${state.redeemableCount}回`;
-      document.getElementById("toNext").textContent = `${state.toNext}pt`;
+  document.getElementById("points").textContent = String(state.points);
+  document.getElementById("rankBadge").textContent = `ランク：${state.rank}`;
 
-      // 累計表示（ランク判定に使う）
-      const lt = document.getElementById("lifetimeLine");
-      if (lt) lt.textContent = `累計：${state.lifetimePoints}pt（ランク判定）`;
+  // ★追加
+  document.getElementById("lifetime").textContent =
+   `ランク判定用 累計：${state.lifetimePoints}pt`;
 
-      renderRewards();
-    }
+  document.getElementById("redeemable").textContent = `${state.redeemableCount}回`;
+  document.getElementById("toNext").textContent = `${state.toNext}pt`;
+
+  renderRewards();
+}
+
 
     function rewardName(th) {
       const idx = th / 50;
@@ -493,6 +496,7 @@
   </script>
 </body>
 </html>
+
 
 
 
