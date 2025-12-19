@@ -277,23 +277,29 @@ function renderHome() {
       return false;
     }
 
-   async function refreshBalance() {
+ async function refreshBalance() {
   if (!state.userId) return;
 
   const data = await apiGet(`/api/me?userId=${encodeURIComponent(state.userId)}`);
 
+  // 現在残高（交換で増減）
   state.points = data.points || 0;
+
+  // 累計ポイント（ランク判定用・交換で減らない）
   state.lifetimePoints = data.lifetimePoints || 0;
+
+  // ランク判定
+  state.rank = calcRank(state.lifetimePoints);
+
+  // 景品関連
   state.redeemableCount = data.redeemableCount || 0;
   state.toNext = data.toNext || 0;
   state.rewardThresholds = data.rewardThresholds || [];
   state.claimedRewards = data.claimedRewards || [];
 
-  // ★ ランク計算
-  state.rank = calcRank(state.lifetimePoints);
-
   renderHome();
 }
+
     async function redeemReward(threshold) {
       try {
         if (!state.userId) return;
@@ -493,6 +499,7 @@ function renderHome() {
   </script>
 </body>
 </html>
+
 
 
 
