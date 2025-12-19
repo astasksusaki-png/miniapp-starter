@@ -302,7 +302,7 @@
         if (!ok) return;
 
         const r = await apiPost("/api/redeem", { userId: state.userId, threshold });
-        state.claimedRewards = r.claimed || [];
+        
         await refreshBalance();
 
         alert("交換を受け付けました。スタッフに画面を見せてください。");
@@ -493,6 +493,7 @@
   </script>
 </body>
 </html>
+
 
 
 
