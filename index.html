@@ -150,14 +150,13 @@
     };
 
     // ★ランク判定（累計ポイントで決まる）
-    function calcRank(lifetimePoints) {
-      const p = Number(lifetimePoints || 0);
-      if (p >= 201) return "ダイヤモンド";
-      if (p >= 151) return "プラチナ";
-      if (p >= 101) return "ゴールド";
-      if (p >= 51)  return "シルバー";
-      if (p >= 1)  return "レギュラー";
-    }
+   function calcRank(p) {
+  if (p <= 50) return "レギュラー";
+  if (p <= 100) return "シルバー";
+  if (p <= 150) return "ゴールド";
+  if (p <= 200) return "プラチナ";
+  return "ダイヤモンド";
+}
 
     function setLog(text) { document.getElementById("log").textContent = text; }
     function setProfileLog(text) { document.getElementById("profileLog").textContent = text; }
@@ -169,22 +168,23 @@
       document.getElementById(screenId).classList.remove("hidden");
     }
 
-   function renderHome() {
+function renderHome() {
   document.getElementById("hello").textContent =
     state.userId ? `${state.displayName} さん、お疲れ様です！` : "ログイン中…";
 
   document.getElementById("points").textContent = String(state.points);
   document.getElementById("rankBadge").textContent = `ランク：${state.rank}`;
 
-  // ★追加
+  // ★ ここが重要
   document.getElementById("lifetime").textContent =
-   `ランク判定用 累計：${state.lifetimePoints}pt`;
+    `ランク判定用 累計：${state.lifetimePoints}pt`;
 
   document.getElementById("redeemable").textContent = `${state.redeemableCount}回`;
   document.getElementById("toNext").textContent = `${state.toNext}pt`;
 
   renderRewards();
 }
+
 
 
     function rewardName(th) {
@@ -277,25 +277,23 @@
       return false;
     }
 
-    async function refreshBalance() {
-      if (!state.userId) return;
+   async function refreshBalance() {
+  if (!state.userId) return;
 
-      const data = await apiGet(`/api/me?userId=${encodeURIComponent(state.userId)}`);
+  const data = await apiGet(`/api/me?userId=${encodeURIComponent(state.userId)}`);
 
-      // 残高
-      state.points = data.points || 0;
-      state.redeemableCount = data.redeemableCount || 0;
-      state.toNext = data.toNext || 0;
-      state.rewardThresholds = data.rewardThresholds || [];
-      state.claimedRewards = data.claimedRewards || [];
+  state.points = data.points || 0;
+  state.lifetimePoints = data.lifetimePoints || 0;
+  state.redeemableCount = data.redeemableCount || 0;
+  state.toNext = data.toNext || 0;
+  state.rewardThresholds = data.rewardThresholds || [];
+  state.claimedRewards = data.claimedRewards || [];
 
-      // ★累計＆ランク
-      state.lifetimePoints = data.lifetimePoints || 0;
-      state.rank = calcRank(state.lifetimePoints);
+  // ★ ランク計算
+  state.rank = calcRank(state.lifetimePoints);
 
-      renderHome();
-    }
-
+  renderHome();
+}
     async function redeemReward(threshold) {
       try {
         if (!state.userId) return;
@@ -495,6 +493,7 @@
   </script>
 </body>
 </html>
+
 
 
 
