@@ -254,23 +254,21 @@ function rewardName(th) {
       });
     }
 
-    async function apiGet(path) {
-      const res = await fetch(path, { method: "GET" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw { status: res.status, data };
-      return data;
-    }
+   async function apiGet(path) {
+  // ★キャッシュ完全回避：毎回URLに ts を付ける
+  const u = new URL(path, location.origin);
+  u.searchParams.set("_ts", String(Date.now()));
 
-    async function apiPost(path, body) {
-      const res = await fetch(path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw { status: res.status, data };
-      return data;
-    }
+  const res = await fetch(u.toString(), {
+    method: "GET",
+    cache: "no-store",
+    headers: { "Cache-Control": "no-cache" },
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, data };
+  return data;
+}
 
     async function ensureProfile() {
       if (!state.userId) return false;
@@ -507,6 +505,7 @@ async function refreshBalance() {
   </script>
 </body>
 </html>
+
 
 
 
