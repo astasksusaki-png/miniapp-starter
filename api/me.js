@@ -18,16 +18,19 @@ function calcRank(total) {
   return "レギュラー";
 }
 
-// 交換履歴（reward_claims が無い/列名違いでも落ちないように）
+// 交換履歴（あなたの環境は rewards_claimed）
 async function getClaimedThresholds(sb, userId) {
+  // ★最優先で rewards_claimed を見る
   const tableCandidates = [
-    "rewards_claimed"
-    "reward_claims",      
+    "rewards_claimed",     // ←これが正解
+    "reward_claims",
     "reward_redemptions",
     "reward_redeems",
     "redeems",
     "redemptions",
   ];
+
+  // しきい値列名の候補（テーブルに合わせて自動判定）
   const colCandidates = ["threshold", "reward_threshold", "claimed_threshold"];
 
   for (const table of tableCandidates) {
@@ -45,7 +48,6 @@ async function getClaimedThresholds(sb, userId) {
       }
 
       const msg = String(error?.message || "");
-      // テーブル/列が無い系は次候補へ
       if (
         msg.includes("Could not find the table") ||
         msg.includes("schema cache") ||
@@ -55,10 +57,10 @@ async function getClaimedThresholds(sb, userId) {
         continue;
       }
 
-      // それ以外は返す（権限など）
       throw new Error(`[${table}.${col}] ${msg}`);
     }
   }
+
   return [];
 }
 
@@ -81,7 +83,7 @@ export default async function handler(req, res) {
 
     const sb = supabaseAdmin();
 
-    // 1) 残高（交換で増減）
+    // 1) 残高（交換で増減する設計ならここが変わる）
     const { data: upRows, error: eUp } = await sb
       .from("user_points")
       .select("points")
@@ -92,15 +94,13 @@ export default async function handler(req, res) {
 
     const points = Number(upRows?.[0]?.points ?? 0);
 
-    // 2) 累計（交換で減らない：point_awards 合計）
+    // 2) 累計（交換で減らない）
     const lifetimePoints = await getLifetimePoints(sb, userId);
-// redemptionでpointsが減っても、累計が残高より小さくなるのはおかしいので補正
-const lifetimeFixed = Math.max(lifetimePoints, points);
 
     // 3) ランク（累計で判定）
-const rank = calcRank(lifetimeFixed);
-    
-    // 4) 交換済み（存在しないテーブルでも落とさない）
+    const rank = calcRank(lifetimePoints);
+
+    // 4) 交換済み取得（rewards_claimed を最優先）
     let claimedRewards = [];
     try {
       claimedRewards = await getClaimedThresholds(sb, userId);
@@ -108,14 +108,14 @@ const rank = calcRank(lifetimeFixed);
       claimedRewards = [];
     }
 
-    // 5) 到達済みの景品しきい値一覧（50刻み）
+    // 5) 到達済みの景品しきい値一覧（残高 points ベース）
     const rewardThresholds = buildRewardThresholds(points);
 
-    // 6) 交換可能回数（到達していて未交換の数）
+    // 6) 交換可能回数（到達していて未交換）
     const claimedSet = new Set(claimedRewards);
     const redeemableCount = rewardThresholds.filter((th) => !claimedSet.has(th)).length;
 
-    // 7) 次の景品まで（0〜49）
+    // 7) 次の景品まで
     const mod = points % 50;
     const toNext = mod === 0 ? 0 : 50 - mod;
 
@@ -124,7 +124,6 @@ const rank = calcRank(lifetimeFixed);
       userId,
       points,
       lifetimePoints,
-     lifetimeFixed,
       rank,
       rewardThresholds,
       claimedRewards,
