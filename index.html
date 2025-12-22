@@ -326,7 +326,10 @@ renderHome();
       try {
         if (!state.userId) return;
 
-        const ok = window.confirm(`${rewardName(threshold)}（${threshold}pt到達）を交換しますか？`);
+        const ok = window.confirm(
+  `この景品を交換します。\nスタッフに画面を見せてください。\n\n実行してよろしいですか？※交換後の取り消しはできません`
+);
+
         if (!ok) return;
 
         const r = await apiPost("/api/redeem", { userId: state.userId, threshold });
@@ -521,6 +524,7 @@ renderHome();
   </script>
 </body>
 </html>
+
 
 
 
