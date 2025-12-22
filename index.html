@@ -77,7 +77,7 @@
       <p class="muted">50ptごとに景品と交換できます（到達分だけ表示されます）</p>
       <div id="rewards" class="rewards"></div>
 
-      <p class="note">※ ランクは「累計獲得ポイント」で決まります。
+      <p class="note">※ ランクは「累計獲得ポイント」で決まります。<br>
       レギュラー➡シルバー➡ゴールド➡プラチナ➡ダイヤモンド</p>
     </div>
 
@@ -175,10 +175,6 @@ function renderHome() {
 
  document.getElementById("points").textContent = String(state.lifetimePoints);
   document.getElementById("rankBadge").textContent = `ランク：${state.rank}`;
-
-  // ★ ここが重要
-  document.getElementById("lifetime").textContent =
-    `ランク判定用 累計：${state.lifetimePoints}pt`;
 
   document.getElementById("redeemable").textContent = `${state.redeemableCount}回`;
   document.getElementById("toNext").textContent = `${state.toNext}pt`;
@@ -501,6 +497,7 @@ renderHome();
   </script>
 </body>
 </html>
+
 
 
 
