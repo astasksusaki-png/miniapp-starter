@@ -1,9 +1,10 @@
 import { json } from "./_store.js";
 import { supabaseAdmin } from "./_supabase.js";
 
-function buildRewardThresholds(points) {
-  const p = Number(points) || 0;
-  const max = Math.floor(p / 50) * 50; // 到達済みの最大 50刻み
+// ★景品表示は「累計(lifetimePoints)」で作る
+function buildRewardThresholdsByLifetime(lifetimePoints) {
+  const p = Number(lifetimePoints) || 0;
+  const max = Math.floor(p / 50) * 50;
   const arr = [];
   for (let th = 50; th <= max; th += 50) arr.push(th);
   return arr;
@@ -11,26 +12,23 @@ function buildRewardThresholds(points) {
 
 function calcRank(total) {
   const t = Number(total) || 0;
-   if (total >= 201) return "ダイヤモンド";
-  if (total >= 151) return "プラチナ";
-  if (total >= 101) return "ゴールド";
-  if (total >= 51)  return "シルバー";
+  if (t >= 201) return "ゴールド";
+  if (t >= 151) return "プラチナ";
+  if (t >= 101) return "シルバー";
+  if (t >= 51) return "ブロンズ";
   return "レギュラー";
 }
 
 // 交換履歴（あなたの環境は rewards_claimed）
 async function getClaimedThresholds(sb, userId) {
-  // ★最優先で rewards_claimed を見る
   const tableCandidates = [
-    "rewards_claimed",     // ←これが正解
+    "rewards_claimed",
     "reward_claims",
     "reward_redemptions",
     "reward_redeems",
     "redeems",
     "redemptions",
   ];
-
-  // しきい値列名の候補（テーブルに合わせて自動判定）
   const colCandidates = ["threshold", "reward_threshold", "claimed_threshold"];
 
   for (const table of tableCandidates) {
@@ -53,14 +51,11 @@ async function getClaimedThresholds(sb, userId) {
         msg.includes("schema cache") ||
         msg.includes("does not exist") ||
         msg.includes("column")
-      ) {
-        continue;
-      }
+      ) continue;
 
       throw new Error(`[${table}.${col}] ${msg}`);
     }
   }
-
   return [];
 }
 
@@ -83,7 +78,7 @@ export default async function handler(req, res) {
 
     const sb = supabaseAdmin();
 
-    // 1) 残高（交換で増減する設計ならここが変わる）
+    // 1) 現在ポイント（表示用：減らさない運用なら基本増えるだけ）
     const { data: upRows, error: eUp } = await sb
       .from("user_points")
       .select("points")
@@ -91,16 +86,15 @@ export default async function handler(req, res) {
       .limit(1);
 
     if (eUp) return json(res, 500, { ok: false, error: eUp.message });
-
     const points = Number(upRows?.[0]?.points ?? 0);
 
-    // 2) 累計（交換で減らない）
+    // 2) 累計（ランク・景品判定用）
     const lifetimePoints = await getLifetimePoints(sb, userId);
 
     // 3) ランク（累計で判定）
     const rank = calcRank(lifetimePoints);
 
-    // 4) 交換済み取得（rewards_claimed を最優先）
+    // 4) 交換済み
     let claimedRewards = [];
     try {
       claimedRewards = await getClaimedThresholds(sb, userId);
@@ -108,22 +102,22 @@ export default async function handler(req, res) {
       claimedRewards = [];
     }
 
-    // 5) 到達済みの景品しきい値一覧（残高 points ベース）
-    const rewardThresholds = buildRewardThresholds(points);
+    // ★5) 景品到達は「累計」で作る
+    const rewardThresholds = buildRewardThresholdsByLifetime(lifetimePoints);
 
-    // 6) 交換可能回数（到達していて未交換）
+    // 6) 交換可能回数
     const claimedSet = new Set(claimedRewards);
     const redeemableCount = rewardThresholds.filter((th) => !claimedSet.has(th)).length;
 
-    // 7) 次の景品まで
-    const mod = points % 50;
+    // 7) 次の景品まで（累計で計算）
+    const mod = lifetimePoints % 50;
     const toNext = mod === 0 ? 0 : 50 - mod;
 
     return json(res, 200, {
       ok: true,
       userId,
-      points,
-      lifetimePoints,
+      points,          // 表示用
+      lifetimePoints,  // 景品/ランク判定用
       rank,
       rewardThresholds,
       claimedRewards,
