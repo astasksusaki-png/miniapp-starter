@@ -149,6 +149,30 @@
 
       profile: null,
     };
+async function apiPost(path, body) {
+  const u = new URL(path, location.origin);
+  u.searchParams.set("_ts", String(Date.now())); // キャッシュ回避
+
+  const res = await fetch(u.toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+
+  const text = await res.text();
+  let data = {};
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { _raw: text };
+  }
+
+  if (!res.ok) {
+    throw { status: res.status, data };
+  }
+  return data;
+}
 
     // ★ランク判定（累計ポイントで決まる）
 function calcRank(total) {
@@ -497,6 +521,7 @@ renderHome();
   </script>
 </body>
 </html>
+
 
 
 
