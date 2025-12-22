@@ -159,6 +159,34 @@ async function apiPost(path, body) {
     body: JSON.stringify(body),
     cache: "no-store",
   });
+// ===== 2段階確認モーダルを開く関数 =====
+function openConfirmModal(text) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("confirmModal");
+    const msg = document.getElementById("confirmText");
+    const yes = document.getElementById("confirmYes");
+    const no = document.getElementById("confirmNo");
+
+    // もし要素が見つからない場合は安全に落とす（HTML①が入ってない等）
+    if (!modal || !msg || !yes || !no) {
+      alert("確認モーダルの要素が見つかりません（confirmModal を追加しましたか？）");
+      return resolve(false);
+    }
+
+    msg.textContent = text;
+    modal.classList.remove("hidden"); // 表示
+
+    const close = (result) => {
+      modal.classList.add("hidden"); // 非表示
+      yes.onclick = null;
+      no.onclick = null;
+      resolve(result);
+    };
+
+    yes.onclick = () => close(true);
+    no.onclick = () => close(false);
+  });
+}
 
   const text = await res.text();
   let data = {};
@@ -326,11 +354,18 @@ renderHome();
       try {
         if (!state.userId) return;
 
-        const ok = window.confirm(
-  `この景品を交換します。\nスタッフに画面を見せてください。\n\n実行してよろしいですか？\n※交換後の取り消しはできません`
+       // ① 1回目：交換してよいか
+const ok1 = await openConfirmModal(
+  `${rewardName(threshold)} を交換します。\nよろしいですか？`
 );
+if (!ok1) return;
 
-        if (!ok) return;
+// ② 2回目：最終確認（取り消し不可など）
+const ok2 = await openConfirmModal(
+  `最終確認：この操作は取り消しできません。\n本当に交換しますか？`
+);
+if (!ok2) return;
+
 
         const r = await apiPost("/api/redeem", { userId: state.userId, threshold });
         
@@ -555,6 +590,7 @@ renderHome();
 
 </body>
 </html>
+
 
 
 
