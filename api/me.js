@@ -12,10 +12,10 @@ function buildRewardThresholdsByLifetime(lifetimePoints) {
 
 function calcRank(total) {
   const t = Number(total) || 0;
-  if (t >= 201) return "ゴールド";
+  if (t >= 201) return "ダイヤモンド";
   if (t >= 151) return "プラチナ";
-  if (t >= 101) return "シルバー";
-  if (t >= 51) return "ブロンズ";
+  if (t >= 101) return "ゴールド";
+  if (t >= 51)  return "シルバー";
   return "レギュラー";
 }
 
