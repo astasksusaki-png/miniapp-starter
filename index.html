@@ -77,7 +77,8 @@
       <p class="muted">50ptごとに景品と交換できます（到達分だけ表示されます）</p>
       <div id="rewards" class="rewards"></div>
 
-      <p class="note">※ ランクは「累計獲得ポイント」で決まります（景品交換で残高が減ってもランクは下がりません）。</p>
+      <p class="note">※ ランクは「累計獲得ポイント」で決まります。
+      レギュラー➡シルバー➡ゴールド➡プラチナ➡ダイヤモンド</p>
     </div>
 
     <!-- 氏名登録（初回のみ） -->
@@ -172,7 +173,7 @@ function renderHome() {
   document.getElementById("hello").textContent =
     state.userId ? `${state.displayName} さん、お疲れ様です！` : "ログイン中…";
 
-  document.getElementById("points").textContent = String(state.points);
+ document.getElementById("points").textContent = String(state.lifetimePoints);
   document.getElementById("rankBadge").textContent = `ランク：${state.rank}`;
 
   // ★ ここが重要
@@ -286,24 +287,19 @@ function rewardName(th) {
 async function refreshBalance() {
   if (!state.userId) return;
 
-  const data = await apiGet(`/api/me?userId=${encodeURIComponent(state.userId)}`);
+ const data = await apiGet(`/api/me?userId=${encodeURIComponent(state.userId)}`);
 
-  // 残高（交換で増減）
-  state.points = data.points || 0;
+state.points = data.points || 0;
+state.lifetimePoints = data.lifetimePoints || 0;  // ★追加
+state.rank = data.rank || "レギュラー";            // ★追加（rankもAPIから反映）
 
-  // 累計（ランク判定用）
-  state.lifetimePoints = data.lifetimePoints || 0;
+state.redeemableCount = data.redeemableCount || 0;
+state.toNext = data.toNext || 0;
+state.rewardThresholds = data.rewardThresholds || [];
+state.claimedRewards = data.claimedRewards || [];
 
-  // ランク文字（APIで計算済み）
-  state.rank = data.rank || "レギュラー";
+renderHome();
 
-  // 景品交換表示に必要な4つ（これが抜けると出ません）
-  state.rewardThresholds = data.rewardThresholds || [];
-  state.claimedRewards = data.claimedRewards || [];
-  state.redeemableCount = data.redeemableCount || 0;
-  state.toNext = data.toNext ?? 0;
-
-  renderHome();
 }
 
     async function redeemReward(threshold) {
@@ -505,6 +501,7 @@ async function refreshBalance() {
   </script>
 </body>
 </html>
+
 
 
 
