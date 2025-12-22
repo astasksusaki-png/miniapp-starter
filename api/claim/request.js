@@ -1,7 +1,6 @@
 import { readJson, json } from "../_store.js";
 
 function makeRequestId() {
-  // Node/Vercel ではだいたい crypto.randomUUID が使えます
   try {
     if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   } catch {}
@@ -23,21 +22,12 @@ export default async function handler(req, res) {
       return json(res, 400, { ok: false, error: "amount must be > 0" });
     }
 
-    // 500円につき1pt
     const pt = Math.floor(amount / 500);
+    if (pt <= 0) return json(res, 400, { ok: false, error: "POINTS_WOULD_BE_ZERO" });
 
-    // 0pt申請は後工程で必ず困るので、ここで止める（以前 points is 0 が出てた対策）
-    if (pt <= 0) {
-      return json(res, 400, { ok: false, error: "POINTS_WOULD_BE_ZERO" });
-    }
-
-    const requestId = makeRequestId();
-
-    // approve.js は requestId を実際には使っていないので、
-    // ここでは「申請の結果を返すだけ」でOK（確実に動く）
     return json(res, 200, {
       ok: true,
-      requestId,
+      requestId: makeRequestId(),
       amount: Math.trunc(amount),
       pt,
     });
