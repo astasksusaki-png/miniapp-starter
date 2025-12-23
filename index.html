@@ -167,21 +167,30 @@ function openConfirmModal(text) {
     const yes = document.getElementById("confirmYes");
     const no = document.getElementById("confirmNo");
 
-    // もし要素が見つからない場合は安全に落とす（HTML①が入ってない等）
     if (!modal || !msg || !yes || !no) {
       alert("確認モーダルの要素が見つかりません（confirmModal を追加しましたか？）");
       return resolve(false);
     }
 
     msg.textContent = text;
-    modal.classList.remove("hidden"); // 表示
+
+    // ★確実に表示
+    modal.classList.remove("hidden");
+    modal.style.display = "flex";
 
     const close = (result) => {
-      modal.classList.add("hidden"); // 非表示
+      // ★確実に非表示
+      modal.classList.add("hidden");
+      modal.style.display = "none";
       yes.onclick = null;
       no.onclick = null;
       resolve(result);
     };
+
+    yes.onclick = () => close(true);
+    no.onclick = () => close(false);
+  });
+}
 
     yes.onclick = () => close(true);
     no.onclick = () => close(false);
@@ -559,12 +568,9 @@ if (!ok2) return;
   </script>
   <!-- 景品交換 確認モーダル -->
 <div id="confirmModal" class="hidden"
-     style="
-       position:fixed; inset:0;
-       background:rgba(0,0,0,.5);
-       display:flex; align-items:center; justify-content:center;
-       z-index:9999;
-     ">
+     style="position:fixed; inset:0; background:rgba(0,0,0,.5);
+       display:none; align-items:center; justify-content:center; z-index:9999;">
+
   <div style="
     background:#fff;
     border-radius:16px;
@@ -590,6 +596,7 @@ if (!ok2) return;
 
 </body>
 </html>
+
 
 
 
