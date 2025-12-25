@@ -127,6 +127,19 @@
   </div>
 
   <script>
+// ===== 起動時デバッグ（どこで止まってるか表示）=====
+window.addEventListener("error", (e) => {
+  const m = "JS ERROR: " + (e.message || e.type);
+  const hello = document.getElementById("hello");
+  if (hello) hello.textContent = m;
+  alert(m);
+});
+window.addEventListener("unhandledrejection", (e) => {
+  const m = "PROMISE ERROR: " + (e.reason?.message || String(e.reason));
+  const hello = document.getElementById("hello");
+  if (hello) hello.textContent = m;
+  alert(m);
+});
     const LIFF_ID = "2008691735-JGZN72Zi";
 
     const state = {
@@ -596,6 +609,7 @@ if (!ok2) return;
 
 </body>
 </html>
+
 
 
 
