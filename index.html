@@ -42,18 +42,20 @@
     .smallBtnDisabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; }
   </style>
 </head>
+
 <body>
   <div class="wrap">
 
-    <!-- ホーム（会員証） -->
+    <!-- ホーム -->
     <div id="home" class="card">
       <p class="muted" id="hello">読み込み中...</p>
-           <div class="row" style="margin-top:6px;">
+
+      <div class="row" style="margin-top:6px;">
         <div>
           <h1 class="title">OMOPO会員証</h1>
           <span class="badge" id="rankBadge">ランク：—</span>
-<p class="muted" id="lifetime"></p>
-          <div id="lifetime" class="muted" style="margin-top:6px;"></div>
+          <!-- ★id重複を修正（lifetimeText に変更） -->
+          <div id="lifetimeText" class="muted" style="margin-top:6px;"></div>
         </div>
         <div class="pt"><span id="points">0</span><small>pt</small></div>
       </div>
@@ -67,7 +69,6 @@
 
       <div class="hr"></div>
 
-      <!-- onclick方式 -->
       <button class="btn btn-primary" id="goAmount" onclick="goAmountClick()">金額入力してポイント申請</button>
       <button class="btn btn-ghost" id="refresh" onclick="refreshClick()">残高を更新</button>
 
@@ -77,11 +78,10 @@
       <p class="muted">50ptごとに景品と交換できます（到達分だけ表示されます）</p>
       <div id="rewards" class="rewards"></div>
 
-      <p class="note">※ ランクは「累計獲得ポイント」で決まります。<br>
-      レギュラー➡シルバー➡ゴールド➡プラチナ➡ダイヤモンド</p>
+      <p class="note">※ ランクは「累計獲得ポイント」で決まります。</p>
     </div>
 
-    <!-- 氏名登録（初回のみ） -->
+    <!-- 氏名登録 -->
     <div id="profile" class="card hidden">
       <h1 class="title">お名前の登録（初回のみ）</h1>
       <p class="muted">ポイント付与の前に、お名前を登録してください（漢字推奨）</p>
@@ -101,7 +101,7 @@
       <div id="profileLog" class="mono">準備中…</div>
     </div>
 
-    <!-- 金額入力（申請→承認QR→付与） -->
+    <!-- 金額入力 -->
     <div id="amount" class="card hidden">
       <h1 class="title">金額入力</h1>
       <p class="muted">会計金額を入力 → 申請 → 承認QR読み取り → 付与</p>
@@ -118,120 +118,101 @@
       <div class="hr"></div>
       <p class="muted" style="margin:0 0 6px;">ログ</p>
       <div id="log" class="mono">準備中…</div>
-      <p class="note">
-       <br/>
-        
-      </p>
     </div>
 
   </div>
 
   <script>
-// ===== 起動時デバッグ（どこで止まってるか表示）=====
-window.addEventListener("error", (e) => {
-  const m = "JS ERROR: " + (e.message || e.type);
-  const hello = document.getElementById("hello");
-  if (hello) hello.textContent = m;
-  alert(m);
-});
-window.addEventListener("unhandledrejection", (e) => {
-  const m = "PROMISE ERROR: " + (e.reason?.message || String(e.reason));
-  const hello = document.getElementById("hello");
-  if (hello) hello.textContent = m;
-  alert(m);
-});
+    // ===== エラーを画面に出す =====
+    window.addEventListener("error", (e) => {
+      const m = "JS ERROR: " + (e.message || e.type);
+      const hello = document.getElementById("hello");
+      if (hello) hello.textContent = m;
+      alert(m);
+    });
+    window.addEventListener("unhandledrejection", (e) => {
+      const m = "PROMISE ERROR: " + (e.reason?.message || String(e.reason));
+      const hello = document.getElementById("hello");
+      if (hello) hello.textContent = m;
+      alert(m);
+    });
+
     const LIFF_ID = "2008691735-JGZN72Zi";
 
     const state = {
       displayName: "—",
       userId: null,
-
-      points: 0,               // 残高（交換で減る）
-      lifetimePoints: 0,       // 累計（交換で減らない）★追加
-
+      points: 0,
+      lifetimePoints: 0,
       redeemableCount: 0,
       toNext: 0,
       rank: "レギュラー",
-
       rewardThresholds: [],
       claimedRewards: [],
-
       requestId: null,
       amount: 0,
       expectedPt: 0,
-
       profile: null,
     };
-async function apiPost(path, body) {
-  const u = new URL(path, location.origin);
-  u.searchParams.set("_ts", String(Date.now())); // キャッシュ回避
 
-  const res = await fetch(u.toString(), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
-// ===== 2段階確認モーダルを開く関数 =====
-function openConfirmModal(text) {
-  return new Promise((resolve) => {
-    const modal = document.getElementById("confirmModal");
-    const msg = document.getElementById("confirmText");
-    const yes = document.getElementById("confirmYes");
-    const no = document.getElementById("confirmNo");
+    // ===== 2段階確認モーダル =====
+    function openConfirmModal(text) {
+      return new Promise((resolve) => {
+        const modal = document.getElementById("confirmModal");
+        const msg = document.getElementById("confirmText");
+        const yes = document.getElementById("confirmYes");
+        const no = document.getElementById("confirmNo");
 
-    if (!modal || !msg || !yes || !no) {
-      alert("確認モーダルの要素が見つかりません（confirmModal を追加しましたか？）");
-      return resolve(false);
+        msg.textContent = text;
+        modal.classList.remove("hidden");
+        modal.style.display = "flex";
+
+        const close = (result) => {
+          modal.classList.add("hidden");
+          modal.style.display = "none";
+          yes.onclick = null;
+          no.onclick = null;
+          resolve(result);
+        };
+
+        yes.onclick = () => close(true);
+        no.onclick = () => close(false);
+      });
     }
 
-    msg.textContent = text;
+    async function apiGet(path) {
+      const u = new URL(path, location.origin);
+      u.searchParams.set("_ts", String(Date.now()));
+      const res = await fetch(u.toString(), { method: "GET", cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw { status: res.status, data };
+      return data;
+    }
 
-    // ★確実に表示
-    modal.classList.remove("hidden");
-    modal.style.display = "flex";
+    async function apiPost(path, body) {
+      const u = new URL(path, location.origin);
+      u.searchParams.set("_ts", String(Date.now()));
+      const res = await fetch(u.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        cache: "no-store",
+      });
 
-    const close = (result) => {
-      // ★確実に非表示
-      modal.classList.add("hidden");
-      modal.style.display = "none";
-      yes.onclick = null;
-      no.onclick = null;
-      resolve(result);
-    };
+      const text = await res.text();
+      let data = {};
+      try { data = JSON.parse(text); } catch { data = { _raw: text }; }
+      if (!res.ok) throw { status: res.status, data };
+      return data;
+    }
 
-    yes.onclick = () => close(true);
-    no.onclick = () => close(false);
-  });
-}
-
-    yes.onclick = () => close(true);
-    no.onclick = () => close(false);
-  });
-}
-
-  const text = await res.text();
-  let data = {};
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = { _raw: text };
-  }
-
-  if (!res.ok) {
-    throw { status: res.status, data };
-  }
-  return data;
-}
-
-    // ★ランク判定（累計ポイントで決まる）
-function calcRank(total) {
-  if (total >= 201) return "ダイヤモンド";
-  if (total >= 151) return "プラチナ";
-  if (total >= 101) return "ゴールド";
-  if (total >= 51)  return "シルバー";
-  return "レギュラー";
-}
+    function calcRank(total) {
+      if (total >= 201) return "ダイヤモンド";
+      if (total >= 151) return "プラチナ";
+      if (total >= 101) return "ゴールド";
+      if (total >= 51)  return "シルバー";
+      return "レギュラー";
+    }
 
     function setLog(text) { document.getElementById("log").textContent = text; }
     function setProfileLog(text) { document.getElementById("profileLog").textContent = text; }
@@ -243,33 +224,34 @@ function calcRank(total) {
       document.getElementById(screenId).classList.remove("hidden");
     }
 
-function renderHome() {
-  document.getElementById("hello").textContent =
-    state.userId ? `${state.displayName} さん、お疲れ様です！` : "ログイン中…";
+    const REWARDS = {
+      50:  "景品：クオカード５００円分",
+      100: "景品：クオカード５００円分 + オリジナルグッズ",
+      150: "景品：クオカード５００円分",
+      200: "景品：クオカード５００円分 + シークレットギフト",
+      250: "景品：？？？",
+    };
+    function rewardName(th) { return REWARDS[th] || `景品（${th}pt）`; }
 
- document.getElementById("points").textContent = String(state.lifetimePoints);
-  document.getElementById("rankBadge").textContent = `ランク：${state.rank}`;
+    function renderHome() {
+      document.getElementById("hello").textContent =
+        state.userId ? `${state.displayName} さん、お疲れ様です！` : "ログイン中…";
 
-  document.getElementById("redeemable").textContent = `${state.redeemableCount}回`;
-  document.getElementById("toNext").textContent = `${state.toNext}pt`;
+      // ★表示したい方をここで選べます
+      // 残高を表示したい → state.points
+      // 累計を表示したい → state.lifetimePoints
+      document.getElementById("points").textContent = String(state.points);
 
-  renderRewards();
-}
+      document.getElementById("rankBadge").textContent = `ランク：${state.rank}`;
 
+      // ★累計の表示を消したいならここを空に
+      document.getElementById("lifetimeText").textContent = "";
 
+      document.getElementById("redeemable").textContent = `${state.redeemableCount}回`;
+      document.getElementById("toNext").textContent = `${state.toNext}pt`;
 
-  const REWARDS = {
-  50:  "景品：クオカード５００円分",
-  100: "景品：クオカード５００円分<br>　　　＋オリジナルグッズ",
-  150: "景品：クオカード５００円分",
-  200: "景品：クオカード５００円分<br>　　　＋シークレットギフト",
-  250: "景品：<br>？？？",
-};
-
-function rewardName(th) {
-  return REWARDS[th] || `景品（${th}pt）`;
-}
-
+      renderRewards();
+    }
 
     function renderRewards() {
       const wrap = document.getElementById("rewards");
@@ -314,6 +296,7 @@ function rewardName(th) {
           </div>
           ${btnHtml}
         `;
+
         wrap.appendChild(card);
       });
 
@@ -325,123 +308,55 @@ function rewardName(th) {
       });
     }
 
-   async function apiGet(path) {
-  // ★キャッシュ完全回避：毎回URLに ts を付ける
-  const u = new URL(path, location.origin);
-  u.searchParams.set("_ts", String(Date.now()));
-
-  const res = await fetch(u.toString(), {
-    method: "GET",
-    cache: "no-store",
-    headers: { "Cache-Control": "no-cache" },
-  });
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw { status: res.status, data };
-  return data;
-}
-
     async function ensureProfile() {
       if (!state.userId) return false;
       const r = await apiGet(`/api/profile/get?userId=${encodeURIComponent(state.userId)}`);
       state.profile = r.profile;
-
       if (state.profile) {
         state.displayName = `${state.profile.last_name} ${state.profile.first_name}`;
-        renderHome();
         return true;
       }
       return false;
     }
 
-async function refreshBalance() {
-  if (!state.userId) return;
+    async function refreshBalance() {
+      if (!state.userId) return;
+      const data = await apiGet(`/api/me?userId=${encodeURIComponent(state.userId)}`);
 
- const data = await apiGet(`/api/me?userId=${encodeURIComponent(state.userId)}`);
+      state.points = data.points || 0;
+      state.lifetimePoints = data.lifetimePoints || 0;
+      state.rank = data.rank || calcRank(state.lifetimePoints);
 
-state.points = data.points || 0;
-state.lifetimePoints = data.lifetimePoints || 0;  // ★追加
-state.rank = data.rank || "レギュラー";            // ★追加（rankもAPIから反映）
+      state.redeemableCount = data.redeemableCount || 0;
+      state.toNext = data.toNext || 0;
+      state.rewardThresholds = data.rewardThresholds || [];
+      state.claimedRewards = data.claimedRewards || [];
 
-state.redeemableCount = data.redeemableCount || 0;
-state.toNext = data.toNext || 0;
-state.rewardThresholds = data.rewardThresholds || [];
-state.claimedRewards = data.claimedRewards || [];
-
-renderHome();
-
-}
-
-    async function redeemReward(threshold) {
-      try {
-        if (!state.userId) return;
-
-       // ① 1回目：交換してよいか
-const ok1 = await openConfirmModal(
-  `${rewardName(threshold)} を交換します。\nよろしいですか？`
-);
-if (!ok1) return;
-
-// ② 2回目：最終確認（取り消し不可など）
-const ok2 = await openConfirmModal(
-  `最終確認：この操作は取り消しできません。\n本当に交換しますか？`
-);
-if (!ok2) return;
-
-
-        const r = await apiPost("/api/redeem", { userId: state.userId, threshold });
-        
-        await refreshBalance();
-
-        alert("交換を受け付けました。スタッフに画面を見せてください。");
-      } catch (e) {
-        if (e?.status === 409 && e?.data?.error === "ALREADY_REDEEMED") {
-          alert("この景品はすでに交換済みです。");
-          await refreshBalance();
-          return;
-        }
-        if (e?.data?.error === "NOT_ENOUGH_POINTS") {
-          alert("ポイントが足りません。");
-          return;
-        }
-        alert("交換エラー: " + JSON.stringify(e?.data || e));
-      }
+      renderHome();
     }
 
-    // onclick 用
+    async function redeemReward(threshold) {
+      const ok1 = await openConfirmModal(`${rewardName(threshold)} を交換します。\nよろしいですか？`);
+      if (!ok1) return;
+
+      const ok2 = await openConfirmModal(`最終確認：この操作は取り消しできません。\n本当に交換しますか？`);
+      if (!ok2) return;
+
+      await apiPost("/api/redeem", { userId: state.userId, threshold });
+      await refreshBalance();
+      alert("交換を受け付けました。スタッフに画面を見せてください。");
+    }
+
     async function goAmountClick() {
-      try {
-        const hello = document.getElementById("hello");
-        if (hello) hello.textContent = "申請ボタン押下：確認中…";
-
-        if (!state.userId) {
-          if (hello) hello.textContent = "ユーザーID未取得です（LIFF初期化待ち。少し待って再度お試しください）";
-          return;
-        }
-
-        const ok = await ensureProfile();
-        if (!ok) {
-          setProfileLog("苗字・名前を入力して「登録して進む」を押してください");
-          show("profile");
-          return;
-        }
-
-        setLog("金額を入力して「申請する」を押してください");
-        show("amount");
-      } catch (e) {
-        const msg = "goAmountClick エラー: " + JSON.stringify(e?.data || e);
-        const hello = document.getElementById("hello");
-        if (hello) hello.textContent = msg;
-      }
+      if (!state.userId) return;
+      const ok = await ensureProfile();
+      if (!ok) { setProfileLog("苗字・名前を入力して「登録して進む」を押してください"); show("profile"); return; }
+      setLog("金額を入力して「申請する」を押してください");
+      show("amount");
     }
 
     async function refreshClick() {
-      try {
-        await refreshBalance();
-      } catch (e) {
-        const hello = document.getElementById("hello");
-        if (hello) hello.textContent = "残高更新エラー: " + JSON.stringify(e?.data || e);
-      }
+      await refreshBalance();
     }
 
     function setupUI() {
@@ -449,106 +364,70 @@ if (!ok2) return;
       document.getElementById("backHome").addEventListener("click", () => show("home"));
 
       document.getElementById("saveProfile").addEventListener("click", async () => {
-        try {
-          if (!state.userId) return;
+        if (!state.userId) return;
+        const last = (document.getElementById("lastName").value || "").trim();
+        const first = (document.getElementById("firstName").value || "").trim();
+        if (!last || !first) { setProfileLog("苗字・名前を入力してください"); return; }
 
-          const last = (document.getElementById("lastName").value || "").trim();
-          const first = (document.getElementById("firstName").value || "").trim();
-          if (!last || !first) { setProfileLog("苗字・名前を入力してください"); return; }
+        setProfileLog("登録中…");
+        await apiPost("/api/profile/save", { user_id: state.userId, last_name: last, first_name: first });
 
-          setProfileLog("登録中…");
-          await apiPost("/api/profile/save", { user_id: state.userId, last_name: last, first_name: first });
-
-          await ensureProfile();
-          setProfileLog("登録完了 ✅ 金額入力へ進みます");
-          setLog("金額を入力して「申請する」を押してください");
-          show("amount");
-        } catch (e) {
-          if (e?.status === 409) { await ensureProfile(); show("amount"); return; }
-          setProfileLog("登録エラー: " + JSON.stringify(e?.data || e));
-        }
+        await ensureProfile();
+        setProfileLog("登録完了 ✅ 金額入力へ進みます");
+        show("amount");
       });
 
       const yen = document.getElementById("yen");
       const calcPt = document.getElementById("calcPt");
       yen.addEventListener("input", () => {
         const v = Number(yen.value || 0);
-        const p = Math.floor(v / 500);
-        calcPt.textContent = `${p}pt`;
+        calcPt.textContent = `${Math.floor(v / 500)}pt`;
       });
 
       document.getElementById("apply").addEventListener("click", async () => {
-        try {
-          if (!state.userId) { setLog("ユーザーID未取得です（LINE内で開いてください）"); return; }
+        if (!state.userId) return;
+        const amount = Number(document.getElementById("yen").value || 0);
+        if (amount <= 0) { setLog("金額を入力してください"); return; }
 
-          const amount = Number(document.getElementById("yen").value || 0);
-          if (amount <= 0) { setLog("金額を入力してください"); return; }
+        setLog("申請中…");
+        const r = await apiPost("/api/claim/request", { userId: state.userId, amount });
 
-          setLog("申請中…");
-          const r = await apiPost("/api/claim/request", { userId: state.userId, amount });
+        state.requestId = r.requestId;
+        state.amount = r.amount;
+        state.expectedPt = r.pt;
 
-          state.requestId = r.requestId;
-          state.amount = r.amount;
-          state.expectedPt = r.pt;
-
-          setLog(
-            `申請OK\nrequestId=${state.requestId}\namount=${state.amount}\npt=${state.expectedPt}\n\n次に「承認QRを読み取る（付与）」を押してください`
-          );
-        } catch (e) {
-          setLog("申請エラー: " + JSON.stringify(e?.data || e));
-        }
+        setLog(`申請OK\nrequestId=${state.requestId}\namount=${state.amount}\npt=${state.expectedPt}\n\n次に「承認QRを読み取る（付与）」を押してください`);
       });
 
       document.getElementById("scanApprove").addEventListener("click", async () => {
-        try {
-          if (!state.userId) { setLog("ユーザーID未取得です"); return; }
-          if (!state.requestId) { setLog("先に「申請する」を押してください"); return; }
+        if (!state.userId) return;
+        if (!state.requestId) { setLog("先に「申請する」を押してください"); return; }
 
-          if (!liff.isInClient()) {
-            setLog("LINEアプリ内で開いていません。LINE内で miniapp URL を開いてください。");
-            return;
-          }
+        if (!liff.isInClient()) { setLog("LINEアプリ内で開いてください"); return; }
 
-          let approveQr = null;
-          if (typeof liff.scanCodeV2 === "function") {
-            setLog("カメラ起動中…（QRを読み取ってください）");
-            const res = await liff.scanCodeV2();
-            approveQr = res?.value ?? "";
-          } else if (typeof liff.scanCode === "function") {
-            setLog("カメラ起動中…（QRを読み取ってください）");
-            const res = await liff.scanCode();
-            approveQr = res?.value ?? "";
-          } else {
-            setLog("この環境ではQR読取が利用できません（scanCodeV2/scanCodeが無効）");
-            return;
-          }
-
-          setLog(`QR読取OK:\n${approveQr}\n\n付与処理中…`);
-
-          const a = await apiPost("/api/claim/approve", {
-            userId: state.userId,
-            requestId: state.requestId,
-            amount: state.amount,
-            approveQr
-          });
-
-          state.points = a.balance;
-          state.redeemableCount = a.redeemableCount;
-          state.toNext = a.toNext;
-
-          renderHome();
-          setLog(
-            `付与成功 ✅\nstoreId=${a.award.storeId}\npt=${a.award.pt}\n新残高=${a.balance}\n\nホームに戻って確認できます`
-          );
-
-          await refreshBalance();
-        } catch (e) {
-          if (e?.status === 409 && e?.data?.error === "ALREADY_AWARDED_TODAY") {
-            setLog(`本日はこの店舗では付与済みです。\nstoreId=${e.data.storeId}\n日付=${e.data.date}`);
-            return;
-          }
-          setLog("付与エラー: " + JSON.stringify(e?.data || e));
+        let approveQr = "";
+        if (typeof liff.scanCodeV2 === "function") {
+          const res = await liff.scanCodeV2();
+          approveQr = res?.value ?? "";
+        } else if (typeof liff.scanCode === "function") {
+          const res = await liff.scanCode();
+          approveQr = res?.value ?? "";
+        } else {
+          setLog("この環境ではQR読取が利用できません");
+          return;
         }
+
+        setLog(`QR読取OK:\n${approveQr}\n\n付与処理中…`);
+
+        await apiPost("/api/claim/approve", {
+          userId: state.userId,
+          requestId: state.requestId,
+          amount: state.amount,
+          approveQr
+        });
+
+        await refreshBalance();
+        show("home");
       });
     }
 
@@ -556,81 +435,32 @@ if (!ok2) return;
       setupUI();
       renderHome();
 
-      try {
-        await liff.init({ liffId: LIFF_ID });
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) { liff.login(); return; }
 
-        if (!liff.isLoggedIn()) {
-          liff.login();
-          return;
-        }
+      const p = await liff.getProfile();
+      state.displayName = p.displayName || "—";
+      state.userId = p.userId;
 
-        const p = await liff.getProfile();
-        state.displayName = p.displayName || "—";
-        state.userId = p.userId;
-
-        await ensureProfile();
-        renderHome();
-
-        await refreshBalance();
-      } catch (e) {
-        document.getElementById("hello").textContent = "LIFF初期化エラー：" + (e?.message || e);
-      }
+      await ensureProfile();
+      await refreshBalance();
     }
 
     main();
   </script>
-  <!-- 景品交換 確認モーダル -->
-<div id="confirmModal" class="hidden"
-     style="position:fixed; inset:0; background:rgba(0,0,0,.5);
-       display:none; align-items:center; justify-content:center; z-index:9999;">
 
-  <div style="
-    background:#fff;
-    border-radius:16px;
-    width:90%; max-width:360px;
-    padding:16px;
-  ">
-    <h2 style="margin:0 0 8px; font-size:18px;">
-      景品交換の確認
-    </h2>
+  <!-- 景品交換 確認モーダル（scriptの後でもOK。openConfirmModalはクリック時に使う） -->
+  <div id="confirmModal" class="hidden"
+       style="position:fixed; inset:0; background:rgba(0,0,0,.5);
+         display:none; align-items:center; justify-content:center; z-index:9999;">
+    <div style="background:#fff; border-radius:16px; width:90%; max-width:360px; padding:16px;">
+      <h2 style="margin:0 0 8px; font-size:18px;">景品交換の確認</h2>
+      <p id="confirmText" style="font-size:14px; margin:0 0 16px; white-space:pre-wrap;"></p>
 
-    <p id="confirmText" style="font-size:14px; margin:0 0 16px;">
-      `この景品を交換します。\nスタッフにこの画面を見せてください。\n※交換後の取り消しはできません\n\n実行してよろしいですか？`
-    </p>
-
-    <button id="confirmYes" class="btn btn-primary">
-      交換する
-    </button>
-    <button id="confirmNo" class="btn btn-ghost">
-      キャンセル
-    </button>
+      <button id="confirmYes" class="btn btn-primary">交換する</button>
+      <button id="confirmNo" class="btn btn-ghost">キャンセル</button>
+    </div>
   </div>
-</div>
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
