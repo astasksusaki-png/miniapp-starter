@@ -339,12 +339,12 @@
       const ok1 = await openConfirmModal(`${rewardName(threshold)} を交換します。\nよろしいですか？`);
       if (!ok1) return;
 
-      const ok2 = await openConfirmModal(`最終確認：この操作は取り消しできません。\n本当に交換しますか？`);
+      const ok2 = await openConfirmModal(`最終確認：この操作は取り消しできません。\nスタッフと一緒に次のボタンを押してください。\n\n本当に交換しますか？`);
       if (!ok2) return;
 
       await apiPost("/api/redeem", { userId: state.userId, threshold });
       await refreshBalance();
-      alert("交換を受け付けました。スタッフに画面を見せてください。");
+      alert("交換を受け付けました。\nスタッフに画面を見せてください。");
     }
 
     async function goAmountClick() {
@@ -464,5 +464,6 @@
 
 </body>
 </html>
+
 
 
