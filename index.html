@@ -156,29 +156,36 @@
     };
 
     // ===== 2段階確認モーダル =====
-    function openConfirmModal(text) {
-      return new Promise((resolve) => {
-        const modal = document.getElementById("confirmModal");
-        const msg = document.getElementById("confirmText");
-        const yes = document.getElementById("confirmYes");
-        const no = document.getElementById("confirmNo");
+function openConfirmModal({ title, text, yesText = "OK", noText = "キャンセル" }) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("confirmModal");
+    const elTitle = document.getElementById("confirmTitle");
+    const elText = document.getElementById("confirmText");
+    const yes = document.getElementById("confirmYes");
+    const no = document.getElementById("confirmNo");
 
-        msg.textContent = text;
-        modal.classList.remove("hidden");
-        modal.style.display = "flex";
+    if (!modal || !elTitle || !elText || !yes || !no) return resolve(false);
 
-        const close = (result) => {
-          modal.classList.add("hidden");
-          modal.style.display = "none";
-          yes.onclick = null;
-          no.onclick = null;
-          resolve(result);
-        };
+    elTitle.textContent = title || "確認";
+    elText.textContent = text || "";
+    yes.textContent = yesText;
+    no.textContent = noText;
 
-        yes.onclick = () => close(true);
-        no.onclick = () => close(false);
-      });
-    }
+    modal.classList.remove("hidden");
+    modal.style.display = "flex";
+
+    const close = (result) => {
+      modal.classList.add("hidden");
+      modal.style.display = "none";
+      yes.onclick = null;
+      no.onclick = null;
+      resolve(result);
+    };
+
+    yes.onclick = () => close(true);
+    no.onclick = () => close(false);
+  });
+}
 
     async function apiGet(path) {
       const u = new URL(path, location.origin);
@@ -336,11 +343,29 @@
     }
 
     async function redeemReward(threshold) {
-      const ok1 = await openConfirmModal(`${rewardName(threshold)} を交換します。\nよろしいですか？`);
-      if (!ok1) return;
+     // ① 1回目：内容確認
+const ok1 = await openConfirmModal({
+  title: "景品交換の確認",
+  text:
+    `【交換する景品】\n${rewardName(threshold)}\n\n` +
+    `この景品に交換しますか？\n（交換済みの場合は実行できません）`,
+  yesText: "交換へ進む",
+  noText: "やめる",
+});
+if (!ok1) return;
 
-      const ok2 = await openConfirmModal(`最終確認：この操作は取り消しできません。\nスタッフと一緒に次のボタンを押してください。\n\n本当に交換しますか？`);
-      if (!ok2) return;
+// ② 2回目：最終確認
+const ok2 = await openConfirmModal({
+  title: "最終確認",
+  text:
+    `この操作は取り消しできません。\n\n` +
+    `スタッフに画面を見せて交換してください。\n\n` +
+    `本当に「交換する」を実行しますか？`,
+  yesText: "交換する",
+  noText: "キャンセル",
+});
+if (!ok2) return;
+
 
       await apiPost("/api/redeem", { userId: state.userId, threshold });
       await refreshBalance();
@@ -471,6 +496,7 @@
 
 </body>
 </html>
+
 
 
 
