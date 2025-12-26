@@ -449,21 +449,29 @@
     main();
   </script>
 
-  <!-- 景品交換 確認モーダル（scriptの後でもOK。openConfirmModalはクリック時に使う） -->
-  <div id="confirmModal" class="hidden"
-       style="position:fixed; inset:0; background:rgba(0,0,0,.5);
-         display:none; align-items:center; justify-content:center; z-index:9999;">
-    <div style="background:#fff; border-radius:16px; width:90%; max-width:360px; padding:16px;">
-      <h2 style="margin:0 0 8px; font-size:18px;">景品交換の確認</h2>
-      <p id="confirmText" style="font-size:14px; margin:0 0 16px; white-space:pre-wrap;"></p>
+<!-- 景品交換 確認モーダル（2段階） -->
+<div id="confirmModal" class="hidden"
+  style="position:fixed; inset:0; background:rgba(0,0,0,.5);
+  display:none; align-items:center; justify-content:center; z-index:9999;">
 
-      <button id="confirmYes" class="btn btn-primary">交換する</button>
-      <button id="confirmNo" class="btn btn-ghost">キャンセル</button>
-    </div>
+  <div style="background:#fff;border-radius:16px;width:90%;max-width:360px;padding:16px;">
+    <h2 id="confirmTitle" style="margin:0 0 8px; font-size:18px;">確認</h2>
+
+    <p id="confirmText" style="font-size:14px; margin:0 0 16px; white-space:pre-wrap;"></p>
+
+    <button id="confirmYes" class="btn btn-primary" style="margin-bottom:10px;">
+      OK
+    </button>
+    <button id="confirmNo" class="btn btn-ghost">
+      キャンセル
+    </button>
   </div>
+</div>
+
 
 </body>
 </html>
+
 
 
 
